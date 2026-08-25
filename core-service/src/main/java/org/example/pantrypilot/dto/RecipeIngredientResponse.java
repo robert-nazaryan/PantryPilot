@@ -1,9 +1,9 @@
 package org.example.pantrypilot.dto;
 
+import org.example.pantrypilot.model.RecipeIngredient;
+
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-
-import org.example.pantrypilot.model.RecipeIngredient;
 
 public record RecipeIngredientResponse(
         Long id,

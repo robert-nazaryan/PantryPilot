@@ -14,7 +14,7 @@ import org.example.pantrypilot.model.User;
 import org.springframework.stereotype.Service;
 
 @Service
-public class JwtService {
+public final class JwtService {
 
     private final SecretKey key;
     private final Duration accessTtl;

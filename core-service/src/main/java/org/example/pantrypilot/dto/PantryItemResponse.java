@@ -1,10 +1,10 @@
 package org.example.pantrypilot.dto;
 
+import org.example.pantrypilot.model.PantryItem;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-
-import org.example.pantrypilot.model.PantryItem;
 
 public record PantryItemResponse(
         Long id,

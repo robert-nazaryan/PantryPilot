@@ -6,9 +6,9 @@ import lombok.RequiredArgsConstructor;
 import org.example.pantrypilot.dto.CreateRecipeIngredientRequest;
 import org.example.pantrypilot.dto.RecipeIngredientResponse;
 import org.example.pantrypilot.dto.UpdateRecipeIngredientRequest;
+import org.example.pantrypilot.security.CurrentUserId;
 import org.example.pantrypilot.service.RecipeIngredientService;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -28,29 +28,27 @@ public class RecipeIngredientController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public RecipeIngredientResponse add(
+            @CurrentUserId Long userId,
             @PathVariable Long recipeId,
             @Valid @RequestBody CreateRecipeIngredientRequest request) {
-        return recipeIngredientService.addIngredient(currentUserId(), recipeId, request);
+        return recipeIngredientService.addIngredient(userId, recipeId, request);
     }
 
     @PutMapping("/{ingredientId}")
     public RecipeIngredientResponse update(
+            @CurrentUserId Long userId,
             @PathVariable Long recipeId,
             @PathVariable Long ingredientId,
             @Valid @RequestBody UpdateRecipeIngredientRequest request) {
-        return recipeIngredientService.updateIngredient(currentUserId(), recipeId, ingredientId, request);
+        return recipeIngredientService.updateIngredient(userId, recipeId, ingredientId, request);
     }
 
     @DeleteMapping("/{ingredientId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(
+            @CurrentUserId Long userId,
             @PathVariable Long recipeId,
             @PathVariable Long ingredientId) {
-        recipeIngredientService.deleteIngredient(currentUserId(), recipeId, ingredientId);
-    }
-
-    private Long currentUserId() {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        return (Long) principal;
+        recipeIngredientService.deleteIngredient(userId, recipeId, ingredientId);
     }
 }

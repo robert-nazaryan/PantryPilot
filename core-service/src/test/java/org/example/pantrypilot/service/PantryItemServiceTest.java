@@ -89,7 +89,7 @@ class PantryItemServiceTest {
 
     @Test
     void listItems_returnsMappedResponsesInRepositoryOrder() {
-        PantryItem a = pantryItem(1L, USER_ID, "Bread", new BigDecimal("1"), LocalDate.now());
+        PantryItem a = pantryItem(1L, USER_ID, "Bread", BigDecimal.ONE, LocalDate.now());
         PantryItem b = pantryItem(2L, USER_ID, "Rice", new BigDecimal("3"), null);
         when(pantryItemRepository.findByUserIdOrderByExpiryDateAscNullsLast(USER_ID))
                 .thenReturn(List.of(a, b));
@@ -120,7 +120,7 @@ class PantryItemServiceTest {
 
     @Test
     void updateItem_success_updatesAllFieldsAndSaves() {
-        PantryItem item = pantryItem(ITEM_ID, USER_ID, "Old", new BigDecimal("1"), null);
+        PantryItem item = pantryItem(ITEM_ID, USER_ID, "Old", BigDecimal.ONE, null);
         when(pantryItemRepository.findByIdAndUserId(ITEM_ID, USER_ID)).thenReturn(Optional.of(item));
         when(pantryItemRepository.save(item)).thenReturn(item);
 
@@ -142,7 +142,7 @@ class PantryItemServiceTest {
         when(pantryItemRepository.findByIdAndUserId(ITEM_ID, OTHER_USER_ID)).thenReturn(Optional.empty());
 
         UpdatePantryItemRequest req = new UpdatePantryItemRequest(
-                "x", new BigDecimal("1"), "u", null, null);
+                "x", BigDecimal.ONE, "u", null, null);
 
         assertThatThrownBy(() -> service.updateItem(OTHER_USER_ID, ITEM_ID, req))
                 .isInstanceOf(NotFoundException.class);
@@ -165,11 +165,11 @@ class PantryItemServiceTest {
 
     @Test
     void consumeQuantity_exactlyToZero_savesRowWithZeroDoesNotDelete() {
-        PantryItem item = pantryItem(ITEM_ID, USER_ID, "Bread", new BigDecimal("1"), null);
+        PantryItem item = pantryItem(ITEM_ID, USER_ID, "Bread", BigDecimal.ONE, null);
         when(pantryItemRepository.findByIdAndUserId(ITEM_ID, USER_ID)).thenReturn(Optional.of(item));
         when(pantryItemRepository.save(item)).thenReturn(item);
 
-        service.consumeQuantity(USER_ID, ITEM_ID, new ConsumeQuantityRequest(new BigDecimal("1")));
+        service.consumeQuantity(USER_ID, ITEM_ID, new ConsumeQuantityRequest(BigDecimal.ONE));
 
         assertThat(item.getQuantity()).isEqualByComparingTo("0");
         verify(pantryItemRepository).save(item);
@@ -178,11 +178,11 @@ class PantryItemServiceTest {
 
     @Test
     void consumeQuantity_moreThanAvailable_throwsInsufficient() {
-        PantryItem item = pantryItem(ITEM_ID, USER_ID, "Rice", new BigDecimal("1"), null);
+        PantryItem item = pantryItem(ITEM_ID, USER_ID, "Rice", BigDecimal.ONE, null);
         when(pantryItemRepository.findByIdAndUserId(ITEM_ID, USER_ID)).thenReturn(Optional.of(item));
 
         assertThatThrownBy(() -> service.consumeQuantity(
-                USER_ID, ITEM_ID, new ConsumeQuantityRequest(new BigDecimal("2"))))
+                USER_ID, ITEM_ID, new ConsumeQuantityRequest(BigDecimal.valueOf(2))))
                 .isInstanceOf(InsufficientQuantityException.class);
 
         assertThat(item.getQuantity()).isEqualByComparingTo("1");
@@ -194,13 +194,13 @@ class PantryItemServiceTest {
         when(pantryItemRepository.findByIdAndUserId(ITEM_ID, OTHER_USER_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.consumeQuantity(
-                OTHER_USER_ID, ITEM_ID, new ConsumeQuantityRequest(new BigDecimal("1"))))
+                OTHER_USER_ID, ITEM_ID, new ConsumeQuantityRequest(BigDecimal.ONE)))
                 .isInstanceOf(NotFoundException.class);
     }
 
     @Test
     void deleteItem_owned_deletesEntity() {
-        PantryItem item = pantryItem(ITEM_ID, USER_ID, "x", new BigDecimal("1"), null);
+        PantryItem item = pantryItem(ITEM_ID, USER_ID, "x", BigDecimal.ONE, null);
         when(pantryItemRepository.findByIdAndUserId(ITEM_ID, USER_ID)).thenReturn(Optional.of(item));
 
         service.deleteItem(USER_ID, ITEM_ID);
@@ -234,7 +234,7 @@ class PantryItemServiceTest {
     @Test
     void listExpiringItems_customDays_usesGivenWindowAndMapsResults() {
         LocalDate today = LocalDate.now();
-        PantryItem item = pantryItem(1L, USER_ID, "Yogurt", new BigDecimal("1"), today.plusDays(1));
+        PantryItem item = pantryItem(1L, USER_ID, "Yogurt", BigDecimal.ONE, today.plusDays(1));
         when(pantryItemRepository.findByUserIdAndExpiryDateBetweenOrderByExpiryDateAsc(
                 USER_ID, today, today.plusDays(3)))
                 .thenReturn(List.of(item));

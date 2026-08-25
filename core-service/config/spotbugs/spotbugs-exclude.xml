@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter xmlns="https://github.com/spotbugs/filter/3.0.0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="https://github.com/spotbugs/filter/3.0.0 https://raw.githubusercontent.com/spotbugs/spotbugs/master/spotbugs/etc/findbugsfilter.xsd">
+
+    <!-- JPA entities require settable mutable relations and expose managed collections;
+         defensive copying would break Hibernate's dirty-checking / cascade lifecycle. -->
+    <Match>
+        <Package name="org.example.pantrypilot.model"/>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+
+    <!-- DTO records (requests + responses) are immutable-by-convention transfer objects.
+         Java records auto-generate accessors that return internal refs; defensive copying
+         would negate the record's value semantics without a real security benefit here. -->
+    <Match>
+        <Package name="org.example.pantrypilot.dto"/>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+
+    <!-- Spring @RestController / @Configuration classes receive singleton beans via
+         constructor DI. The "exposed reference" is a Spring-managed service; no external
+         caller ever hands one in, so defensive copying is meaningless here. -->
+    <Match>
+        <Or>
+            <Package name="org.example.pantrypilot.controller"/>
+            <Package name="org.example.pantrypilot.config"/>
+        </Or>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+</FindBugsFilter>

@@ -9,4 +9,5 @@ public record CreateRecipeRequest(
         @NotBlank String instructions,
         @Min(0) Integer cookTimeMinutes,
         String[] tags
-) {}
+) {
+}

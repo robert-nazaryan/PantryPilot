@@ -10,6 +10,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
+import org.example.pantrypilot.security.AuthenticatedUser;
 import org.example.pantrypilot.service.JwtService;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -36,9 +37,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private void authenticate(String token) {
         try {
-            Long userId = jwtService.parseUserId(token);
+            AuthenticatedUser principal = new AuthenticatedUser(jwtService.parseUserId(token));
             UsernamePasswordAuthenticationToken auth =
-                    new UsernamePasswordAuthenticationToken(userId, null, List.of());
+                    new UsernamePasswordAuthenticationToken(principal, null, List.of());
             SecurityContextHolder.getContext().setAuthentication(auth);
         } catch (JwtException | IllegalArgumentException ignored) {
             SecurityContextHolder.clearContext();

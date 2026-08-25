@@ -54,7 +54,7 @@ class AuthServiceTest {
 
     @Test
     void register_success_savesUserAndIssuesTokenPair() {
-        RegisterRequest req = new RegisterRequest("alice@example.com", "password123", "Alice");
+        final RegisterRequest req = new RegisterRequest("alice@example.com", "password123", "Alice");
         User saved = userWithId(1L, "alice@example.com", "HASHED");
         when(userRepository.existsByEmail("alice@example.com")).thenReturn(false);
         when(passwordEncoder.encode("password123")).thenReturn("HASHED");

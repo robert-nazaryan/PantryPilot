@@ -91,7 +91,7 @@ class RecipeIngredientServiceTest {
         when(recipeIngredientRepository.save(ingredient)).thenReturn(ingredient);
 
         UpdateRecipeIngredientRequest req = new UpdateRecipeIngredientRequest(
-                "New", new BigDecimal("1"), "cup");
+                "New", BigDecimal.ONE, "cup");
 
         RecipeIngredientResponse resp = service.updateIngredient(
                 USER_ID, RECIPE_ID, INGREDIENT_ID, req);
