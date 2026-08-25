@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: PantryPilot
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/pantrypilot
+    username: pantrypilot
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+jwt:
+  secret: 7f3a9c2e6b814d5fa927c1e4b86a0d739c52f1e8a64b3d90f27e6c1a5b8d4e72
+  access-token-ttl-minutes: 15
+  refresh-token-ttl-days: 7

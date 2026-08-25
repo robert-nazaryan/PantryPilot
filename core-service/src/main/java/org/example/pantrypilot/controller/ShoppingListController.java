@@ -3,14 +3,12 @@ package org.example.pantrypilot.controller;
 import jakarta.validation.Valid;
 
 import lombok.RequiredArgsConstructor;
-import org.example.pantrypilot.dto.CreateRecipeRequest;
+import org.example.pantrypilot.dto.CreateShoppingListRequest;
 import org.example.pantrypilot.dto.PageResponse;
-import org.example.pantrypilot.dto.RecipeResponse;
-import org.example.pantrypilot.dto.RecipeSummaryResponse;
 import org.example.pantrypilot.dto.ShoppingListResponse;
-import org.example.pantrypilot.dto.UpdateRecipeRequest;
+import org.example.pantrypilot.dto.ShoppingListSummaryResponse;
+import org.example.pantrypilot.dto.UpdateShoppingListRequest;
 import org.example.pantrypilot.security.CurrentUserId;
-import org.example.pantrypilot.service.RecipeService;
 import org.example.pantrypilot.service.ShoppingListService;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -27,51 +25,43 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/recipes")
+@RequestMapping("/api/shopping-lists")
 @RequiredArgsConstructor
-public class RecipeController {
+public class ShoppingListController {
 
-    private final RecipeService recipeService;
     private final ShoppingListService shoppingListService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public RecipeResponse create(
+    public ShoppingListResponse create(
             @CurrentUserId Long userId,
-            @Valid @RequestBody CreateRecipeRequest request) {
-        return recipeService.createRecipe(userId, request);
+            @Valid @RequestBody CreateShoppingListRequest request) {
+        return shoppingListService.createList(userId, request);
     }
 
     @GetMapping
-    public PageResponse<RecipeSummaryResponse> list(
+    public PageResponse<ShoppingListSummaryResponse> list(
             @CurrentUserId Long userId,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return recipeService.listRecipes(userId, pageable);
+        return shoppingListService.listLists(userId, pageable);
     }
 
     @GetMapping("/{id}")
-    public RecipeResponse get(@CurrentUserId Long userId, @PathVariable Long id) {
-        return recipeService.getRecipe(userId, id);
+    public ShoppingListResponse get(@CurrentUserId Long userId, @PathVariable Long id) {
+        return shoppingListService.getList(userId, id);
     }
 
     @PutMapping("/{id}")
-    public RecipeResponse update(
+    public ShoppingListResponse update(
             @CurrentUserId Long userId,
             @PathVariable Long id,
-            @Valid @RequestBody UpdateRecipeRequest request) {
-        return recipeService.updateRecipe(userId, id, request);
+            @Valid @RequestBody UpdateShoppingListRequest request) {
+        return shoppingListService.updateList(userId, id, request);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@CurrentUserId Long userId, @PathVariable Long id) {
-        recipeService.deleteRecipe(userId, id);
-    }
-
-    @PostMapping("/{recipeId}/generate-shopping-list")
-    @ResponseStatus(HttpStatus.CREATED)
-    public ShoppingListResponse generateShoppingList(
-            @CurrentUserId Long userId, @PathVariable Long recipeId) {
-        return shoppingListService.generateFromRecipe(userId, recipeId);
+        shoppingListService.deleteList(userId, id);
     }
 }

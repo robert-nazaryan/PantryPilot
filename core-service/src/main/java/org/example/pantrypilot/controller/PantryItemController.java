@@ -7,10 +7,14 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.pantrypilot.dto.ConsumeQuantityRequest;
 import org.example.pantrypilot.dto.CreatePantryItemRequest;
+import org.example.pantrypilot.dto.PageResponse;
 import org.example.pantrypilot.dto.PantryItemResponse;
 import org.example.pantrypilot.dto.UpdatePantryItemRequest;
 import org.example.pantrypilot.security.CurrentUserId;
 import org.example.pantrypilot.service.PantryItemService;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -40,8 +44,10 @@ public class PantryItemController {
     }
 
     @GetMapping
-    public List<PantryItemResponse> list(@CurrentUserId Long userId) {
-        return pantryItemService.listItems(userId);
+    public PageResponse<PantryItemResponse> list(
+            @CurrentUserId Long userId,
+            @PageableDefault(size = 20, sort = "expiryDate", direction = Sort.Direction.ASC) Pageable pageable) {
+        return pantryItemService.listItems(userId, pageable);
     }
 
     @GetMapping("/expiring")

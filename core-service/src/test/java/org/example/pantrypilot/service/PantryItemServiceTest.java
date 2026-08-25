@@ -7,6 +7,7 @@ import java.util.Optional;
 
 import org.example.pantrypilot.dto.ConsumeQuantityRequest;
 import org.example.pantrypilot.dto.CreatePantryItemRequest;
+import org.example.pantrypilot.dto.PageResponse;
 import org.example.pantrypilot.dto.PantryItemResponse;
 import org.example.pantrypilot.dto.UpdatePantryItemRequest;
 import org.example.pantrypilot.model.PantryItem;
@@ -18,8 +19,14 @@ import org.example.pantrypilot.service.exception.NotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -88,15 +95,50 @@ class PantryItemServiceTest {
     }
 
     @Test
-    void listItems_returnsMappedResponsesInRepositoryOrder() {
+    void listItems_returnsMappedPageInRepositoryOrder() {
         PantryItem a = pantryItem(1L, USER_ID, "Bread", BigDecimal.ONE, LocalDate.now());
         PantryItem b = pantryItem(2L, USER_ID, "Rice", new BigDecimal("3"), null);
-        when(pantryItemRepository.findByUserIdOrderByExpiryDateAscNullsLast(USER_ID))
-                .thenReturn(List.of(a, b));
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<PantryItem> page = new PageImpl<>(List.of(a, b), pageable, 2);
+        when(pantryItemRepository.findByUserIdOrderByExpiryDateAscNullsLast(
+                eq(USER_ID), any(Pageable.class))).thenReturn(page);
 
-        List<PantryItemResponse> resp = service.listItems(USER_ID);
+        PageResponse<PantryItemResponse> resp = service.listItems(USER_ID, pageable);
 
-        assertThat(resp).extracting(PantryItemResponse::id).containsExactly(1L, 2L);
+        assertThat(resp.content()).extracting(PantryItemResponse::id).containsExactly(1L, 2L);
+        assertThat(resp.totalElements()).isEqualTo(2);
+        assertThat(resp.totalPages()).isEqualTo(1);
+        assertThat(resp.page()).isEqualTo(0);
+        assertThat(resp.size()).isEqualTo(20);
+    }
+
+    @Test
+    void listItems_capsPageSizeAtMax() {
+        Pageable requested = PageRequest.of(0, 500);
+        when(pantryItemRepository.findByUserIdOrderByExpiryDateAscNullsLast(
+                eq(USER_ID), any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
+
+        service.listItems(USER_ID, requested);
+
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(pantryItemRepository).findByUserIdOrderByExpiryDateAscNullsLast(
+                eq(USER_ID), captor.capture());
+        assertThat(captor.getValue().getPageSize()).isEqualTo(PantryItemService.MAX_PAGE_SIZE);
+    }
+
+    @Test
+    void listItems_stripsSortSoRepositoryJpqlOrderByWins() {
+        Pageable requested = PageRequest.of(1, 20, Sort.by(Sort.Direction.ASC, "name"));
+        when(pantryItemRepository.findByUserIdOrderByExpiryDateAscNullsLast(
+                eq(USER_ID), any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
+
+        service.listItems(USER_ID, requested);
+
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(pantryItemRepository).findByUserIdOrderByExpiryDateAscNullsLast(
+                eq(USER_ID), captor.capture());
+        assertThat(captor.getValue().getSort().isUnsorted()).isTrue();
+        assertThat(captor.getValue().getPageNumber()).isEqualTo(1);
     }
 
     @Test

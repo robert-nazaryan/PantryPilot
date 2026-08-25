@@ -7,6 +7,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.example.pantrypilot.dto.ConsumeQuantityRequest;
 import org.example.pantrypilot.dto.CreatePantryItemRequest;
+import org.example.pantrypilot.dto.PageResponse;
 import org.example.pantrypilot.dto.PantryItemResponse;
 import org.example.pantrypilot.dto.UpdatePantryItemRequest;
 import org.example.pantrypilot.model.PantryItem;
@@ -15,6 +16,9 @@ import org.example.pantrypilot.repository.PantryItemRepository;
 import org.example.pantrypilot.repository.UserRepository;
 import org.example.pantrypilot.service.exception.InsufficientQuantityException;
 import org.example.pantrypilot.service.exception.NotFoundException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class PantryItemService {
 
+    static final int MAX_PAGE_SIZE = 100;
+    static final int DEFAULT_PAGE_SIZE = 20;
     private static final int DEFAULT_EXPIRING_DAYS = 7;
 
     private final PantryItemRepository pantryItemRepository;
@@ -43,10 +49,11 @@ public class PantryItemService {
     }
 
     @Transactional(readOnly = true)
-    public List<PantryItemResponse> listItems(Long userId) {
-        return pantryItemRepository.findByUserIdOrderByExpiryDateAscNullsLast(userId).stream()
-                .map(PantryItemResponse::from)
-                .toList();
+    public PageResponse<PantryItemResponse> listItems(Long userId, Pageable pageable) {
+        Pageable capped = capPageable(pageable);
+        Page<PantryItem> page = pantryItemRepository.findByUserIdOrderByExpiryDateAscNullsLast(
+                userId, capped);
+        return PageResponse.from(page, PantryItemResponse::from);
     }
 
     @Transactional(readOnly = true)
@@ -98,5 +105,15 @@ public class PantryItemService {
     private PantryItem loadOwnedItem(Long userId, Long itemId) {
         return pantryItemRepository.findByIdAndUserId(itemId, userId)
                 .orElseThrow(() -> new NotFoundException("Pantry item not found"));
+    }
+
+    private static Pageable capPageable(Pageable pageable) {
+        int size = pageable.getPageSize();
+        if (size <= 0) {
+            size = DEFAULT_PAGE_SIZE;
+        } else if (size > MAX_PAGE_SIZE) {
+            size = MAX_PAGE_SIZE;
+        }
+        return PageRequest.of(Math.max(pageable.getPageNumber(), 0), size);
     }
 }
