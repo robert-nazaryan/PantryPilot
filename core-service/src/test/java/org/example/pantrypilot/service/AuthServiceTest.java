@@ -1,10 +1,10 @@
 package org.example.pantrypilot.service;
 
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 
 import org.example.pantrypilot.config.JwtProperties;
-import org.example.pantrypilot.dto.AuthResponse;
 import org.example.pantrypilot.dto.LoginRequest;
 import org.example.pantrypilot.dto.RegisterRequest;
 import org.example.pantrypilot.model.RefreshToken;
@@ -61,9 +61,9 @@ class AuthServiceTest {
         when(userRepository.save(any(User.class))).thenReturn(saved);
         stubTokenIssuance(saved);
 
-        AuthResponse resp = authService.register(req);
+        TokenPair resp = authService.register(req);
 
-        assertResponseMatches(resp);
+        assertTokenPairMatches(resp);
         verify(refreshTokenRepository).save(argThat(rt -> rt.getTokenHash().equals(HASHED_REFRESH)
                 && rt.getUser() == saved
                 && rt.getExpiresAt().isAfter(OffsetDateTime.now())));
@@ -89,9 +89,9 @@ class AuthServiceTest {
         when(passwordEncoder.matches("password123", "HASHED")).thenReturn(true);
         stubTokenIssuance(user);
 
-        AuthResponse resp = authService.login(new LoginRequest("alice@example.com", "password123"));
+        TokenPair resp = authService.login(new LoginRequest("alice@example.com", "password123"));
 
-        assertResponseMatches(resp);
+        assertTokenPairMatches(resp);
         verify(refreshTokenRepository).save(any(RefreshToken.class));
     }
 
@@ -130,9 +130,10 @@ class AuthServiceTest {
         when(refreshTokenGenerator.generate()).thenReturn(newRaw);
         when(refreshTokenGenerator.hash(newRaw)).thenReturn(newHash);
 
-        AuthResponse resp = authService.refresh(RAW_REFRESH);
+        TokenPair resp = authService.refresh(RAW_REFRESH);
 
-        assertThat(resp.refreshToken()).isEqualTo(newRaw);
+        assertThat(resp.rawRefreshToken()).isEqualTo(newRaw);
+        assertThat(resp.refreshTokenTtl()).isEqualTo(Duration.ofDays(7));
         assertThat(existing.getRevokedAt()).isNotNull();
         verify(refreshTokenRepository).save(existing);
         verify(refreshTokenRepository).save(argThat(rt -> newHash.equals(rt.getTokenHash())));
@@ -224,10 +225,11 @@ class AuthServiceTest {
         when(refreshTokenGenerator.hash(RAW_REFRESH)).thenReturn(HASHED_REFRESH);
     }
 
-    private void assertResponseMatches(AuthResponse resp) {
-        assertThat(resp.accessToken()).isEqualTo("ACCESS_TOKEN");
-        assertThat(resp.refreshToken()).isEqualTo(RAW_REFRESH);
-        assertThat(resp.expiresIn()).isEqualTo(900L);
+    private void assertTokenPairMatches(TokenPair pair) {
+        assertThat(pair.accessToken()).isEqualTo("ACCESS_TOKEN");
+        assertThat(pair.rawRefreshToken()).isEqualTo(RAW_REFRESH);
+        assertThat(pair.accessTokenTtlSeconds()).isEqualTo(900L);
+        assertThat(pair.refreshTokenTtl()).isEqualTo(Duration.ofDays(7));
     }
 
     private static User userWithId(Long id, String email, String hash) {

@@ -5,7 +5,6 @@ import java.time.OffsetDateTime;
 
 import lombok.RequiredArgsConstructor;
 import org.example.pantrypilot.config.JwtProperties;
-import org.example.pantrypilot.dto.AuthResponse;
 import org.example.pantrypilot.dto.LoginRequest;
 import org.example.pantrypilot.dto.RegisterRequest;
 import org.example.pantrypilot.model.RefreshToken;
@@ -31,7 +30,7 @@ public class AuthService {
     private final JwtProperties jwtProperties;
 
     @Transactional
-    public AuthResponse register(RegisterRequest req) {
+    public TokenPair register(RegisterRequest req) {
         if (userRepository.existsByEmail(req.email())) {
             throw new EmailAlreadyTakenException();
         }
@@ -44,7 +43,7 @@ public class AuthService {
     }
 
     @Transactional
-    public AuthResponse login(LoginRequest req) {
+    public TokenPair login(LoginRequest req) {
         User user = userRepository.findByEmail(req.email())
                 .orElseThrow(InvalidCredentialsException::new);
         if (!passwordEncoder.matches(req.password(), user.getPasswordHash())) {
@@ -54,7 +53,7 @@ public class AuthService {
     }
 
     @Transactional
-    public AuthResponse refresh(String rawRefreshToken) {
+    public TokenPair refresh(String rawRefreshToken) {
         RefreshToken stored = lookupActiveRefreshToken(rawRefreshToken);
         stored.setRevokedAt(OffsetDateTime.now());
         refreshTokenRepository.save(stored);
@@ -82,16 +81,18 @@ public class AuthService {
         return stored;
     }
 
-    private AuthResponse issueTokenPair(User user) {
+    private TokenPair issueTokenPair(User user) {
         String accessToken = jwtService.issueAccessToken(user);
         String rawRefresh = refreshTokenGenerator.generate();
+        Duration refreshTtl = refreshTokenTtl();
         RefreshToken refreshToken = RefreshToken.builder()
                 .user(user)
                 .tokenHash(refreshTokenGenerator.hash(rawRefresh))
-                .expiresAt(OffsetDateTime.now().plus(refreshTokenTtl()))
+                .expiresAt(OffsetDateTime.now().plus(refreshTtl))
                 .build();
         refreshTokenRepository.save(refreshToken);
-        return new AuthResponse(accessToken, rawRefresh, jwtService.getAccessTokenTtlSeconds());
+        return new TokenPair(
+                accessToken, rawRefresh, jwtService.getAccessTokenTtlSeconds(), refreshTtl);
     }
 
     private Duration refreshTokenTtl() {
