@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { Link, NavLink } from "react-router-dom";
 import {
+  BookOpen,
   LogOut,
   Menu,
   Moon,
@@ -22,12 +23,12 @@ interface NavItem {
   icon: LucideIcon;
 }
 
-// TODO: add { to: "/recipes", label: "Recipes", icon: BookOpen }
 // TODO: add { to: "/shopping-lists", label: "Shopping lists", icon: ClipboardList }
-// once those routes exist.
+// once that route exists.
 const NAV_ITEMS: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/pantry", label: "Pantry", icon: PackageOpen },
+  { to: "/recipes", label: "Recipes", icon: BookOpen },
 ];
 
 export function Navbar(): ReactNode {

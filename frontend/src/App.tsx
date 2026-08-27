@@ -7,6 +7,9 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { LoginPage } from "./pages/LoginPage";
 import { PantryItemFormPage } from "./pages/PantryItemFormPage";
 import { PantryPage } from "./pages/PantryPage";
+import { RecipeDetailPage } from "./pages/RecipeDetailPage";
+import { RecipeFormPage } from "./pages/RecipeFormPage";
+import { RecipesPage } from "./pages/RecipesPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { useAuth } from "./context/useAuth";
 
@@ -47,6 +50,10 @@ function App(): ReactNode {
         <Route path="/pantry" element={<PantryPage />} />
         <Route path="/pantry/new" element={<PantryItemFormPage mode="create" />} />
         <Route path="/pantry/:id/edit" element={<PantryItemFormPage mode="edit" />} />
+        <Route path="/recipes" element={<RecipesPage />} />
+        <Route path="/recipes/new" element={<RecipeFormPage mode="create" />} />
+        <Route path="/recipes/:id" element={<RecipeDetailPage />} />
+        <Route path="/recipes/:id/edit" element={<RecipeFormPage mode="edit" />} />
       </Route>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
