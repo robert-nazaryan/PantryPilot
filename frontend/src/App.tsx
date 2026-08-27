@@ -1,14 +1,18 @@
 import type { ReactNode } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import { AuthenticatedLayout } from "./components/AuthenticatedLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
-import { HomePage } from "./pages/HomePage";
+import { AuthCallbackPage } from "./pages/AuthCallbackPage";
+import { DashboardPage } from "./pages/DashboardPage";
 import { LoginPage } from "./pages/LoginPage";
+import { PantryItemFormPage } from "./pages/PantryItemFormPage";
+import { PantryPage } from "./pages/PantryPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { useAuth } from "./context/useAuth";
 
 function RedirectIfAuthenticated({ children }: { children: ReactNode }): ReactNode {
   const { status } = useAuth();
-  if (status === "authenticated") return <Navigate to="/" replace />;
+  if (status === "authenticated") return <Navigate to="/dashboard" replace />;
   return children;
 }
 
@@ -31,15 +35,21 @@ function App(): ReactNode {
           </RedirectIfAuthenticated>
         }
       />
+      <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route
-        path="/"
         element={
           <ProtectedRoute>
-            <HomePage />
+            <AuthenticatedLayout />
           </ProtectedRoute>
         }
-      />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      >
+        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/pantry" element={<PantryPage />} />
+        <Route path="/pantry/new" element={<PantryItemFormPage mode="create" />} />
+        <Route path="/pantry/:id/edit" element={<PantryItemFormPage mode="edit" />} />
+      </Route>
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
 }

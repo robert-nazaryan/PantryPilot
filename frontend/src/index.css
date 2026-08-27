@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Inter", -apple-system, ui-sans-serif, system-ui, sans-serif;
 
@@ -13,6 +15,13 @@
   --color-border-subtle: #E7E5E4;
   --color-text-secondary: #78716C;
   --color-text-primary: #292524;
+
+  --color-surface-page-dark: #0C0A09;
+  --color-surface-card-dark: #1C1917;
+  --color-surface-elevated-dark: #292524;
+  --color-border-subtle-dark: #44403C;
+  --color-text-secondary-dark: #A8A29E;
+  --color-text-primary-dark: #FAFAF9;
 
   --text-caption: 0.75rem;
   --text-caption--line-height: 1rem;
@@ -34,6 +43,12 @@ html, body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+html.dark, html.dark body {
+  background-color: var(--color-surface-page-dark);
+  color: var(--color-text-primary-dark);
+  color-scheme: dark;
 }
 
 body {

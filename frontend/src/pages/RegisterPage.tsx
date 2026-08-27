@@ -3,6 +3,8 @@ import type { FormEvent, ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthLayout } from "../components/AuthLayout";
 import { Button } from "../components/Button";
+import { GoogleButton } from "../components/GoogleButton";
+import { OrDivider } from "../components/OrDivider";
 import { TextField } from "../components/TextField";
 import { useAuth } from "../context/useAuth";
 import { ApiError } from "../api/client";
@@ -85,7 +87,11 @@ export function RegisterPage(): ReactNode {
         </>
       }
     >
-      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4">
+        <GoogleButton label="Sign up with Google" />
+        <OrDivider />
+      </div>
+      <form onSubmit={handleSubmit} noValidate className="mt-4 flex flex-col gap-4">
         <TextField
           label="Email"
           type="email"
@@ -118,7 +124,7 @@ export function RegisterPage(): ReactNode {
         {formError && (
           <div
             role="alert"
-            className="rounded-lg border border-warning/40 bg-warning/5 px-3 py-2 text-body-sm text-warning"
+            className="rounded-lg border border-warning/40 bg-warning/5 px-3 py-2 text-body-sm text-warning dark:bg-warning/10"
           >
             {formError}
           </div>

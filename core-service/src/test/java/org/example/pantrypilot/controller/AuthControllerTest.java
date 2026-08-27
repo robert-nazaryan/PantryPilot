@@ -6,6 +6,7 @@ import jakarta.servlet.http.Cookie;
 
 import org.hamcrest.Matchers;
 import org.example.pantrypilot.config.AuthCookieProperties;
+import org.example.pantrypilot.config.RefreshCookieFactory;
 import org.example.pantrypilot.dto.ErrorResponse;
 import org.example.pantrypilot.service.AuthService;
 import org.example.pantrypilot.service.TokenPair;
@@ -48,7 +49,8 @@ class AuthControllerTest {
 
     @BeforeEach
     void setUp() {
-        AuthController controller = new AuthController(authService, new AuthCookieProperties(false));
+        RefreshCookieFactory cookieFactory = new RefreshCookieFactory(new AuthCookieProperties(false));
+        AuthController controller = new AuthController(authService, cookieFactory);
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new TestAuthAdvice())
                 .setMessageConverters(new JacksonJsonHttpMessageConverter())

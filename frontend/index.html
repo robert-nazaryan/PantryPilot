@@ -7,6 +7,18 @@
     <link rel="preconnect" href="https://rsms.me/" />
     <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
     <title>PantryPilot</title>
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('pantrypilot-theme');
+          if (stored === 'dark') {
+            document.documentElement.classList.add('dark');
+          }
+        } catch (e) {
+          /* ignore storage errors */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

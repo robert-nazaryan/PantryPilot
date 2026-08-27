@@ -21,11 +21,15 @@ export function TextField({
 
   const borderClass = error
     ? "border-warning focus:border-warning focus:ring-warning"
-    : "border-border-subtle focus:border-primary focus:ring-primary";
+    : "border-border-subtle focus:border-primary focus:ring-primary " +
+      "dark:border-border-subtle-dark dark:focus:border-primary";
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={inputId} className="text-body-sm font-medium text-text-primary">
+      <label
+        htmlFor={inputId}
+        className="text-body-sm font-medium text-text-primary dark:text-text-primary-dark"
+      >
         {label}
       </label>
       <input
@@ -37,6 +41,9 @@ export function TextField({
           "placeholder:text-text-secondary/70 " +
           "focus:outline-none focus:ring-2 focus:ring-offset-0 " +
           "transition-colors duration-150 " +
+          "dark:bg-surface-elevated-dark dark:text-text-primary-dark " +
+          "dark:placeholder:text-text-secondary-dark/70 " +
+          "[color-scheme:light] dark:[color-scheme:dark] " +
           borderClass + " " + className
         }
         {...rest}
@@ -46,7 +53,10 @@ export function TextField({
           {error}
         </p>
       ) : hint ? (
-        <p id={`${inputId}-hint`} className="text-body-sm text-text-secondary">
+        <p
+          id={`${inputId}-hint`}
+          className="text-body-sm text-text-secondary dark:text-text-secondary-dark"
+        >
           {hint}
         </p>
       ) : null}

@@ -118,6 +118,10 @@ export function AuthProvider({ children }: AuthProviderProps): ReactNode {
     clearSession();
   }, [clearSession]);
 
+  const adoptSession = useCallback((token: string, expiresIn: number) => {
+    applyTokens(token, expiresIn);
+  }, [applyTokens]);
+
   const value = useMemo<AuthContextValue>(() => ({
     status,
     user,
@@ -125,7 +129,8 @@ export function AuthProvider({ children }: AuthProviderProps): ReactNode {
     login,
     register,
     logout,
-  }), [status, user, accessToken, login, register, logout]);
+    adoptSession,
+  }), [status, user, accessToken, login, register, logout, adoptSession]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

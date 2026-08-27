@@ -46,9 +46,19 @@ public class AuthService {
     public TokenPair login(LoginRequest req) {
         User user = userRepository.findByEmail(req.email())
                 .orElseThrow(InvalidCredentialsException::new);
+        if (user.getPasswordHash() == null) {
+            throw new InvalidCredentialsException();
+        }
         if (!passwordEncoder.matches(req.password(), user.getPasswordHash())) {
             throw new InvalidCredentialsException();
         }
+        return issueTokenPair(user);
+    }
+
+    @Transactional
+    public TokenPair loginWithGoogle(String googleSubject, String email, String displayName) {
+        User user = userRepository.findByGoogleId(googleSubject)
+                .orElseGet(() -> linkOrCreateGoogleUser(googleSubject, email, displayName));
         return issueTokenPair(user);
     }
 
@@ -68,6 +78,19 @@ public class AuthService {
                     rt.setRevokedAt(OffsetDateTime.now());
                     refreshTokenRepository.save(rt);
                 });
+    }
+
+    private User linkOrCreateGoogleUser(String googleSubject, String email, String displayName) {
+        return userRepository.findByEmail(email)
+                .map(existing -> {
+                    existing.setGoogleId(googleSubject);
+                    return userRepository.save(existing);
+                })
+                .orElseGet(() -> userRepository.save(User.builder()
+                        .email(email)
+                        .googleId(googleSubject)
+                        .displayName(displayName)
+                        .build()));
     }
 
     private RefreshToken lookupActiveRefreshToken(String rawRefreshToken) {

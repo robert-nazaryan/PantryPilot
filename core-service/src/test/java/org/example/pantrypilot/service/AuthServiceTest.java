@@ -119,6 +119,76 @@ class AuthServiceTest {
     }
 
     @Test
+    void login_googleOnlyAccount_throwsInvalidCredentialsWithoutLeaking() {
+        User googleOnly = User.builder()
+                .id(1L)
+                .email("google@example.com")
+                .passwordHash(null)
+                .googleId("google-sub-123")
+                .build();
+        when(userRepository.findByEmail("google@example.com")).thenReturn(Optional.of(googleOnly));
+
+        assertThatThrownBy(() -> authService.login(new LoginRequest("google@example.com", "any")))
+                .isInstanceOf(InvalidCredentialsException.class);
+
+        verifyNoInteractions(passwordEncoder, jwtService, refreshTokenGenerator);
+        verify(refreshTokenRepository, never()).save(any());
+    }
+
+    @Test
+    void loginWithGoogle_existingGoogleUser_issuesTokensNoLinkageWrite() {
+        User user = googleUser(1L, "chef@example.com", "google-sub-1");
+        when(userRepository.findByGoogleId("google-sub-1")).thenReturn(Optional.of(user));
+        stubTokenIssuance(user);
+
+        TokenPair pair = authService.loginWithGoogle("google-sub-1", "chef@example.com", "Chef");
+
+        assertTokenPairMatches(pair);
+        verify(userRepository, never()).save(any());
+        verify(userRepository, never()).findByEmail(any());
+    }
+
+    @Test
+    void loginWithGoogle_existingEmailPasswordUser_linksGoogleIdAndIssuesTokens() {
+        User existing = userWithId(1L, "shared@example.com", "HASHED");
+        when(userRepository.findByGoogleId("google-sub-2")).thenReturn(Optional.empty());
+        when(userRepository.findByEmail("shared@example.com")).thenReturn(Optional.of(existing));
+        when(userRepository.save(existing)).thenReturn(existing);
+        stubTokenIssuance(existing);
+
+        TokenPair pair = authService.loginWithGoogle("google-sub-2", "shared@example.com", "Shared");
+
+        assertTokenPairMatches(pair);
+        assertThat(existing.getGoogleId()).isEqualTo("google-sub-2");
+        assertThat(existing.getPasswordHash()).isEqualTo("HASHED");
+        verify(userRepository).save(existing);
+    }
+
+    @Test
+    void loginWithGoogle_unknownAccount_createsNewUserWithoutPassword() {
+        when(userRepository.findByGoogleId("google-sub-3")).thenReturn(Optional.empty());
+        when(userRepository.findByEmail("newbie@example.com")).thenReturn(Optional.empty());
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> {
+            User u = inv.getArgument(0);
+            u.setId(42L);
+            return u;
+        });
+        when(jwtService.issueAccessToken(any(User.class))).thenReturn("ACCESS_TOKEN");
+        when(jwtService.getAccessTokenTtlSeconds()).thenReturn(900L);
+        when(refreshTokenGenerator.generate()).thenReturn(RAW_REFRESH);
+        when(refreshTokenGenerator.hash(RAW_REFRESH)).thenReturn(HASHED_REFRESH);
+
+        TokenPair pair = authService.loginWithGoogle("google-sub-3", "newbie@example.com", "Newbie");
+
+        assertThat(pair.accessToken()).isEqualTo("ACCESS_TOKEN");
+        verify(userRepository).save(argThat(u ->
+                "newbie@example.com".equals(u.getEmail())
+                        && "google-sub-3".equals(u.getGoogleId())
+                        && "Newbie".equals(u.getDisplayName())
+                        && u.getPasswordHash() == null));
+    }
+
+    @Test
     void refresh_success_rotatesToken() {
         User user = userWithId(1L, "alice@example.com", "HASHED");
         RefreshToken existing = activeRefreshToken(user);
@@ -234,6 +304,10 @@ class AuthServiceTest {
 
     private static User userWithId(Long id, String email, String hash) {
         return User.builder().id(id).email(email).passwordHash(hash).build();
+    }
+
+    private static User googleUser(Long id, String email, String googleId) {
+        return User.builder().id(id).email(email).googleId(googleId).build();
     }
 
     private static RefreshToken activeRefreshToken(User user) {

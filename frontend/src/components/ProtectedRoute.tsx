@@ -19,9 +19,9 @@ export function ProtectedRoute({ children }: ProtectedRouteProps): ReactNode {
 
 function FullPageLoading(): ReactNode {
   return (
-    <div className="grid min-h-dvh place-items-center bg-surface-page">
-      <div className="flex flex-col items-center gap-3 text-text-secondary">
-        <div className="h-8 w-8 animate-pulse rounded-full bg-border-subtle" />
+    <div className="grid min-h-dvh place-items-center bg-surface-page dark:bg-surface-page-dark">
+      <div className="flex flex-col items-center gap-3 text-text-secondary dark:text-text-secondary-dark">
+        <div className="h-8 w-8 animate-pulse rounded-full bg-border-subtle dark:bg-border-subtle-dark" />
         <p className="text-body-sm">Loading…</p>
       </div>
     </div>

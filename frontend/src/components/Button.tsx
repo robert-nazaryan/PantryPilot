@@ -19,9 +19,13 @@ const variants: Record<Variant, string> = {
   primary:
     "bg-primary text-white hover:bg-primary-hover active:bg-primary-hover",
   secondary:
-    "bg-surface-card text-text-primary border border-border-subtle hover:bg-border-subtle",
+    "bg-surface-card text-text-primary border border-border-subtle hover:bg-border-subtle " +
+    "dark:bg-surface-elevated-dark dark:text-text-primary-dark dark:border-border-subtle-dark " +
+    "dark:hover:bg-border-subtle-dark",
   ghost:
-    "bg-transparent text-text-secondary hover:text-text-primary hover:bg-surface-card",
+    "bg-transparent text-text-secondary hover:text-text-primary hover:bg-surface-card " +
+    "dark:text-text-secondary-dark dark:hover:text-text-primary-dark " +
+    "dark:hover:bg-surface-elevated-dark",
 };
 
 export function Button({

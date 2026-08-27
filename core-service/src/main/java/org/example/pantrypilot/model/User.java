@@ -39,11 +39,14 @@ public class User {
     @Column(name = "email", nullable = false, unique = true, length = 255)
     private String email;
 
-    @Column(name = "password_hash", nullable = false, length = 255)
+    @Column(name = "password_hash", length = 255)
     private String passwordHash;
 
     @Column(name = "display_name", length = 100)
     private String displayName;
+
+    @Column(name = "google_id", unique = true, length = 255)
+    private String googleId;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

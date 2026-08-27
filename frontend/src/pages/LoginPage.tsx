@@ -1,8 +1,10 @@
 import { useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AuthLayout } from "../components/AuthLayout";
 import { Button } from "../components/Button";
+import { GoogleButton } from "../components/GoogleButton";
+import { OrDivider } from "../components/OrDivider";
 import { TextField } from "../components/TextField";
 import { useAuth } from "../context/useAuth";
 import { ApiError } from "../api/client";
@@ -14,13 +16,22 @@ interface FieldErrors {
   password?: string;
 }
 
+const OAUTH_ERROR_MESSAGES: Record<string, string> = {
+  google_login_failed: "Google sign-in didn't complete. Please try again.",
+  oauth_callback_missing_token: "We couldn't complete the sign-in. Please try again.",
+};
+
 export function LoginPage(): ReactNode {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const oauthError = searchParams.get("error");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [formError, setFormError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(
+    oauthError ? (OAUTH_ERROR_MESSAGES[oauthError] ?? null) : null,
+  );
   const [submitting, setSubmitting] = useState(false);
 
   function validate(): FieldErrors {
@@ -66,7 +77,11 @@ export function LoginPage(): ReactNode {
         </>
       }
     >
-      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4">
+        <GoogleButton label="Continue with Google" />
+        <OrDivider />
+      </div>
+      <form onSubmit={handleSubmit} noValidate className="mt-4 flex flex-col gap-4">
         <TextField
           label="Email"
           type="email"
@@ -89,7 +104,7 @@ export function LoginPage(): ReactNode {
         {formError && (
           <div
             role="alert"
-            className="rounded-lg border border-warning/40 bg-warning/5 px-3 py-2 text-body-sm text-warning"
+            className="rounded-lg border border-warning/40 bg-warning/5 px-3 py-2 text-body-sm text-warning dark:bg-warning/10"
           >
             {formError}
           </div>
