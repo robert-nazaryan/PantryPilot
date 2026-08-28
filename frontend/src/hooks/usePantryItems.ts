@@ -36,6 +36,15 @@ export function usePantryItemQuery(id: number | null): UseQueryResult<PantryItem
   });
 }
 
+export function useExpiringPantryItemsQuery(
+  days?: number,
+): UseQueryResult<PantryItemResponse[]> {
+  return useQuery({
+    queryKey: [...PANTRY_ITEMS_QUERY_KEY, "expiring", { days: days ?? "default" }],
+    queryFn: () => api.listExpiringPantryItems(days),
+  });
+}
+
 function useInvalidatePantryLists() {
   const qc = useQueryClient();
   return () => qc.invalidateQueries({ queryKey: PANTRY_ITEMS_QUERY_KEY });

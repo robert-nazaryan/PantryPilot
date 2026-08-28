@@ -9,6 +9,42 @@ import { decodeJwt } from "./jwt";
 
 const PROACTIVE_REFRESH_FRACTION = 0.8;
 const MIN_REFRESH_DELAY_SECONDS = 30;
+const DISPLAY_NAME_STORAGE_KEY = "pantrypilot-display-name";
+
+function loadStoredDisplayName(email: string): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  try {
+    const raw = window.localStorage.getItem(DISPLAY_NAME_STORAGE_KEY);
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw) as { email?: string; displayName?: string };
+    return parsed.email === email ? parsed.displayName : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function persistDisplayName(email: string, displayName: string | undefined): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (displayName) {
+      window.localStorage.setItem(
+        DISPLAY_NAME_STORAGE_KEY,
+        JSON.stringify({ email, displayName }),
+      );
+    }
+  } catch {
+    // ignore quota / privacy-mode errors
+  }
+}
+
+function clearStoredDisplayName(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(DISPLAY_NAME_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+}
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -35,7 +71,15 @@ export function AuthProvider({ children }: AuthProviderProps): ReactNode {
     setAccessToken(token);
     accessTokenRef.current = token;
     const claims = decodeJwt(token);
-    setUser({ email: claims?.email ?? "", displayName });
+    const email = claims?.email ?? "";
+    setUser((prev) => {
+      const resolved =
+        displayName ??
+        (prev && prev.email === email ? prev.displayName : undefined) ??
+        loadStoredDisplayName(email);
+      if (resolved) persistDisplayName(email, resolved);
+      return { email, displayName: resolved };
+    });
     setStatus("authenticated");
 
     clearRefreshTimer();
@@ -54,6 +98,7 @@ export function AuthProvider({ children }: AuthProviderProps): ReactNode {
     setUser(null);
     setStatus("unauthenticated");
     clearRefreshTimer();
+    clearStoredDisplayName();
   }, [clearRefreshTimer]);
 
   const refreshTokens = useCallback(async (): Promise<string | null> => {
