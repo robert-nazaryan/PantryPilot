@@ -94,9 +94,9 @@ public class PantryItemService {
     @Transactional(readOnly = true)
     public List<PantryItemResponse> listExpiringItems(Long userId, Integer days) {
         int window = (days == null || days < 0) ? DEFAULT_EXPIRING_DAYS : days;
-        LocalDate today = LocalDate.now();
+        LocalDate end = LocalDate.now().plusDays(window);
         return pantryItemRepository
-                .findByUserIdAndExpiryDateBetweenOrderByExpiryDateAsc(userId, today, today.plusDays(window))
+                .findByUserIdAndExpiryDateLessThanEqualOrderByExpiryDateAsc(userId, end)
                 .stream()
                 .map(PantryItemResponse::from)
                 .toList();

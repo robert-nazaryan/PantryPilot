@@ -262,29 +262,45 @@ class PantryItemServiceTest {
 
     @Test
     void listExpiringItems_nullDays_usesDefaultSevenDayWindow() {
-        LocalDate today = LocalDate.now();
-        when(pantryItemRepository.findByUserIdAndExpiryDateBetweenOrderByExpiryDateAsc(
-                eq(USER_ID), eq(today), eq(today.plusDays(7))))
+        LocalDate end = LocalDate.now().plusDays(7);
+        when(pantryItemRepository.findByUserIdAndExpiryDateLessThanEqualOrderByExpiryDateAsc(
+                eq(USER_ID), eq(end)))
                 .thenReturn(List.of());
 
         assertThat(service.listExpiringItems(USER_ID, null)).isEmpty();
 
-        verify(pantryItemRepository).findByUserIdAndExpiryDateBetweenOrderByExpiryDateAsc(
-                USER_ID, today, today.plusDays(7));
+        verify(pantryItemRepository).findByUserIdAndExpiryDateLessThanEqualOrderByExpiryDateAsc(
+                USER_ID, end);
     }
 
     @Test
     void listExpiringItems_customDays_usesGivenWindowAndMapsResults() {
         LocalDate today = LocalDate.now();
         PantryItem item = pantryItem(1L, USER_ID, "Yogurt", BigDecimal.ONE, today.plusDays(1));
-        when(pantryItemRepository.findByUserIdAndExpiryDateBetweenOrderByExpiryDateAsc(
-                USER_ID, today, today.plusDays(3)))
+        when(pantryItemRepository.findByUserIdAndExpiryDateLessThanEqualOrderByExpiryDateAsc(
+                USER_ID, today.plusDays(3)))
                 .thenReturn(List.of(item));
 
         List<PantryItemResponse> resp = service.listExpiringItems(USER_ID, 3);
 
         assertThat(resp).hasSize(1);
         assertThat(resp.get(0).name()).isEqualTo("Yogurt");
+    }
+
+    @Test
+    void listExpiringItems_includesAlreadyExpiredItems() {
+        LocalDate today = LocalDate.now();
+        PantryItem expired = pantryItem(1L, USER_ID, "Cottage cheese", BigDecimal.ONE, today.minusDays(2));
+        PantryItem soon = pantryItem(2L, USER_ID, "Milk", BigDecimal.ONE, today.plusDays(3));
+        when(pantryItemRepository.findByUserIdAndExpiryDateLessThanEqualOrderByExpiryDateAsc(
+                USER_ID, today.plusDays(7)))
+                .thenReturn(List.of(expired, soon));
+
+        List<PantryItemResponse> resp = service.listExpiringItems(USER_ID, null);
+
+        assertThat(resp).hasSize(2);
+        assertThat(resp.get(0).name()).isEqualTo("Cottage cheese");
+        assertThat(resp.get(1).name()).isEqualTo("Milk");
     }
 
     private static PantryItem pantryItem(Long id, Long userId, String name, BigDecimal qty, LocalDate expiry) {
