@@ -1,14 +1,30 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { Check, Pencil, Trash2, X } from "lucide-react";
+import { Check, Package, Pencil, Scale, Tag, Trash2, X } from "lucide-react";
 import { Button } from "./Button";
+import { Combobox } from "./Combobox";
 import { TextField } from "./TextField";
 import { ApiError } from "../api/client";
 import {
   useDeleteIngredientMutation,
   useUpdateIngredientMutation,
 } from "../hooks/useRecipes";
+import { useDistinctPantryUnits } from "../hooks/usePantryItems";
 import type { RecipeIngredientResponse } from "../types/recipe";
+
+const UNIT_SEEDS = ["pcs", "g", "kg", "ml", "l", "tsp", "tbsp", "cup", "oz", "lb"];
+
+function mergeSuggestions(seeds: string[], userValues: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const v of [...userValues, ...seeds]) {
+    const key = v.trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(v.trim());
+  }
+  return out;
+}
 
 interface IngredientRowProps {
   recipeId: number;
@@ -24,6 +40,11 @@ export function IngredientRow({ recipeId, ingredient }: IngredientRowProps): Rea
 
   const update = useUpdateIngredientMutation();
   const del = useDeleteIngredientMutation();
+  const unitsQuery = useDistinctPantryUnits();
+  const unitOptions = useMemo(
+    () => mergeSuggestions(UNIT_SEEDS, unitsQuery.data ?? []),
+    [unitsQuery.data],
+  );
 
   const [name, setName] = useState(ingredient.name);
   const [quantity, setQuantity] = useState(String(ingredient.quantity));
@@ -117,6 +138,7 @@ export function IngredientRow({ recipeId, ingredient }: IngredientRowProps): Rea
         <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-3">
           <TextField
             label="Name"
+            icon={Tag}
             value={name}
             onChange={(e) => setName(e.target.value)}
             error={nameError}
@@ -125,6 +147,7 @@ export function IngredientRow({ recipeId, ingredient }: IngredientRowProps): Rea
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <TextField
               label="Quantity"
+              icon={Scale}
               type="number"
               inputMode="decimal"
               step="0.001"
@@ -134,13 +157,16 @@ export function IngredientRow({ recipeId, ingredient }: IngredientRowProps): Rea
               error={quantityError}
               required
             />
-            <TextField
+            <Combobox
               label="Unit"
+              icon={Package}
               value={unit}
-              onChange={(e) => setUnit(e.target.value)}
+              onChange={setUnit}
+              options={unitOptions}
               error={unitError}
               placeholder="e.g. g, cups"
               hint={unitError ? undefined : "Optional"}
+              maxLength={MAX_UNIT}
             />
           </div>
           {submitError && (

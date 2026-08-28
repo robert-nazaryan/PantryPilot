@@ -1,50 +1,47 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { X } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 
-interface TagInputProps {
+interface ComboboxProps {
   label: string;
-  value: string[];
-  onChange: (next: string[]) => void;
-  options?: string[];
+  value: string;
+  onChange: (next: string) => void;
+  options: string[];
   icon?: LucideIcon;
+  placeholder?: string;
   hint?: string;
   error?: string | null;
-  placeholder?: string;
-  maxTagLength?: number;
+  required?: boolean;
+  maxLength?: number;
+  "data-testid"?: string;
 }
 
-export function TagInput({
+export function Combobox({
   label,
   value,
   onChange,
-  options = [],
+  options,
   icon: Icon,
+  placeholder,
   hint,
   error,
-  placeholder = "Type and press Enter",
-  maxTagLength = 40,
-}: TagInputProps): ReactNode {
+  required,
+  maxLength,
+  "data-testid": dataTestId,
+}: ComboboxProps): ReactNode {
   const inputId = useId();
   const listboxId = `${inputId}-listbox`;
-  const describedById = error
-    ? `${inputId}-error`
-    : hint
-      ? `${inputId}-hint`
-      : undefined;
-  const [draft, setDraft] = useState("");
+  const describedById = error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined;
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
-  const suggestions = useMemo(() => {
-    const q = draft.trim().toLowerCase();
-    const selected = new Set(value.map((t) => t.toLowerCase()));
-    const filtered = options.filter((o) => !selected.has(o.toLowerCase()));
-    if (!q) return filtered;
-    return filtered.filter((o) => o.toLowerCase().includes(q));
-  }, [draft, options, value]);
+  const filtered = useMemo(() => {
+    const q = value.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter((o) => o.toLowerCase().includes(q));
+  }, [value, options]);
 
   useEffect(() => {
     if (!open) return;
@@ -57,34 +54,21 @@ export function TagInput({
   }, [open]);
 
   const clampedActive =
-    active >= 0 && suggestions.length > 0
-      ? Math.min(active, suggestions.length - 1)
+    active >= 0 && filtered.length > 0
+      ? Math.min(active, filtered.length - 1)
       : -1;
 
-  function commit(raw: string): void {
-    const trimmed = raw.trim();
-    if (!trimmed) return;
-    if (trimmed.length > maxTagLength) return;
-    if (value.some((t) => t.toLowerCase() === trimmed.toLowerCase())) {
-      setDraft("");
-      setOpen(false);
-      return;
-    }
-    onChange([...value, trimmed]);
-    setDraft("");
-    setActive(-1);
+  function commit(next: string): void {
+    onChange(next);
     setOpen(false);
-  }
-
-  function removeAt(index: number): void {
-    onChange(value.filter((_, i) => i !== index));
+    setActive(-1);
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>): void {
     if (event.key === "ArrowDown") {
       event.preventDefault();
       if (!open) setOpen(true);
-      setActive((i) => Math.min(i + 1, suggestions.length - 1));
+      setActive((i) => Math.min(i + 1, filtered.length - 1));
       return;
     }
     if (event.key === "ArrowUp") {
@@ -92,12 +76,10 @@ export function TagInput({
       setActive((i) => Math.max(i - 1, 0));
       return;
     }
-    if (event.key === "Enter" || event.key === ",") {
-      event.preventDefault();
+    if (event.key === "Enter") {
       if (open && clampedActive >= 0) {
-        commit(suggestions[clampedActive]);
-      } else {
-        commit(draft);
+        event.preventDefault();
+        commit(filtered[clampedActive]);
       }
       return;
     }
@@ -108,10 +90,6 @@ export function TagInput({
         setOpen(false);
         setActive(-1);
       }
-      return;
-    }
-    if (event.key === "Backspace" && !draft && value.length > 0) {
-      onChange(value.slice(0, -1));
     }
   }
 
@@ -134,8 +112,7 @@ export function TagInput({
       </label>
       <div
         className={
-          "relative flex min-h-11 w-full flex-wrap items-center gap-1.5 rounded-lg border bg-white p-1.5 " +
-          (Icon ? "pl-9 " : "") +
+          "relative flex min-h-11 w-full items-center rounded-lg border bg-white " +
           "focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-0 " +
           "transition-colors duration-150 " +
           "dark:bg-surface-elevated-dark " +
@@ -148,35 +125,9 @@ export function TagInput({
             aria-hidden
           />
         )}
-        {value.map((tag, index) => (
-          <span
-            key={`${tag}-${index}`}
-            className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-body-sm text-primary dark:bg-primary/20"
-          >
-            {tag}
-            <button
-              type="button"
-              onClick={() => removeAt(index)}
-              aria-label={`Remove ${tag}`}
-              className="grid h-4 w-4 place-items-center rounded-sm hover:bg-primary/20"
-            >
-              <X className="h-3 w-3" aria-hidden />
-            </button>
-          </span>
-        ))}
         <input
           id={inputId}
-          value={draft}
-          onChange={(e) => {
-            setDraft(e.target.value);
-            if (!open) setOpen(true);
-            setActive(-1);
-          }}
-          onFocus={() => setOpen(true)}
-          onClick={() => setOpen(true)}
-          onKeyDown={handleKeyDown}
-          onBlur={() => commit(draft)}
-          placeholder={value.length === 0 ? placeholder : ""}
+          type="text"
           role="combobox"
           aria-expanded={open}
           aria-autocomplete="list"
@@ -184,30 +135,64 @@ export function TagInput({
           aria-activedescendant={
             open && clampedActive >= 0 ? `${listboxId}-opt-${clampedActive}` : undefined
           }
+          value={value}
+          onChange={(e) => {
+            const v = e.target.value;
+            onChange(v);
+            if (!open) setOpen(true);
+            setActive(-1);
+          }}
+          onFocus={() => setOpen(true)}
+          onClick={() => setOpen(true)}
+          onBlur={() => {
+            setOpen(false);
+            setActive(-1);
+          }}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          required={required}
+          maxLength={maxLength}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedById}
-          data-testid="tag-input"
+          data-testid={dataTestId}
           autoComplete="off"
           className={
-            "min-w-24 flex-1 bg-transparent px-2 py-1 text-body text-text-primary " +
+            "w-full bg-transparent text-body text-text-primary " +
+            (Icon ? "pl-9 pr-9 " : "pl-3 pr-9 ") +
+            "min-h-11 rounded-lg " +
             "placeholder:text-text-secondary/70 focus:outline-none " +
             "dark:text-text-primary-dark dark:placeholder:text-text-secondary-dark/70"
           }
         />
-        {open && suggestions.length > 0 && (
+        <button
+          type="button"
+          tabIndex={-1}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            setOpen((v) => !v);
+          }}
+          aria-label={open ? "Close suggestions" : "Show suggestions"}
+          className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-md text-text-secondary transition-colors duration-150 hover:bg-surface-card dark:text-text-secondary-dark dark:hover:bg-surface-card-dark"
+        >
+          <ChevronDown
+            className={"h-4 w-4 transition-transform duration-150 " + (open ? "rotate-180" : "")}
+            aria-hidden
+          />
+        </button>
+        {open && filtered.length > 0 && (
           <ul
             id={listboxId}
             role="listbox"
             className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-auto rounded-lg border border-border-subtle bg-white py-1 shadow-lg dark:border-border-subtle-dark dark:bg-surface-card-dark"
           >
-            {suggestions.map((opt, i) => {
+            {filtered.map((opt, i) => {
               const isActive = i === clampedActive;
               return (
                 <li
                   key={opt}
                   id={`${listboxId}-opt-${i}`}
                   role="option"
-                  aria-selected={false}
+                  aria-selected={opt === value}
                   onMouseEnter={() => setActive(i)}
                   onMouseDown={(e) => {
                     e.preventDefault();

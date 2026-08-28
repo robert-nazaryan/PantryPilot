@@ -3,8 +3,7 @@ import type { ReactNode } from "react";
 import { CalendarClock, CircleAlert, Pencil, Trash2 } from "lucide-react";
 import { Button } from "./Button";
 import type { PantryItemResponse } from "../types/pantry";
-import { ApiError } from "../api/client";
-import { useConsumePantryItemMutation, useDeletePantryItemMutation } from "../hooks/usePantryItems";
+import { useDeletePantryItemMutation } from "../hooks/usePantryItems";
 
 interface PantryItemCardProps {
   item: PantryItemResponse;
@@ -12,35 +11,21 @@ interface PantryItemCardProps {
 }
 
 const EXPIRING_SOON_DAYS = 7;
-const QUICK_DECREMENTS: number[] = [1, 0.5];
 
 export function PantryItemCard({ item, onEdit }: PantryItemCardProps): ReactNode {
-  const consume = useConsumePantryItemMutation();
   const del = useDeletePantryItemMutation();
-  const [consumeError, setConsumeError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const isEmpty = item.quantity === 0;
   const expiryStatus = getExpiryStatus(item.expiryDate);
 
-  async function handleConsume(amount: number) {
-    setConsumeError(null);
-    try {
-      await consume.mutateAsync({ id: item.id, body: { quantity: amount } });
-    } catch (err) {
-      if (err instanceof ApiError && err.code === "insufficient_quantity") {
-        setConsumeError(`You only have ${formatQuantity(item.quantity)} ${item.unit}.`);
-      } else {
-        setConsumeError("Couldn't update. Try again.");
-      }
-    }
-  }
-
   async function handleDelete() {
+    setDeleteError(null);
     try {
       await del.mutateAsync(item.id);
     } catch {
-      setConsumeError("Couldn't delete. Try again.");
+      setDeleteError("Couldn't delete. Try again.");
       setConfirmingDelete(false);
     }
   }
@@ -110,7 +95,7 @@ export function PantryItemCard({ item, onEdit }: PantryItemCardProps): ReactNode
         </div>
       </div>
 
-      {confirmingDelete ? (
+      {confirmingDelete && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-warning/40 bg-warning/5 px-3 py-2 dark:bg-warning/10">
           <span className="flex-1 text-body-sm text-text-primary dark:text-text-primary-dark">
             Delete this item?
@@ -126,29 +111,11 @@ export function PantryItemCard({ item, onEdit }: PantryItemCardProps): ReactNode
             Delete
           </Button>
         </div>
-      ) : (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-caption font-medium uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
-            Consume
-          </span>
-          {QUICK_DECREMENTS.map((amount) => (
-            <Button
-              key={amount}
-              variant="secondary"
-              disabled={item.quantity < amount || consume.isPending}
-              onClick={() => handleConsume(amount)}
-              aria-label={`Consume ${amount} ${item.unit}`}
-              className="min-w-0 px-3"
-            >
-              −{formatQuantity(amount)}
-            </Button>
-          ))}
-          {consumeError && (
-            <p role="alert" className="w-full text-body-sm text-warning">
-              {consumeError}
-            </p>
-          )}
-        </div>
+      )}
+      {deleteError && !confirmingDelete && (
+        <p role="alert" className="text-body-sm text-warning">
+          {deleteError}
+        </p>
       )}
     </li>
   );
@@ -156,7 +123,7 @@ export function PantryItemCard({ item, onEdit }: PantryItemCardProps): ReactNode
 
 function formatQuantity(value: number): string {
   const rounded = Math.round(value * 1000) / 1000;
-  return Number.isInteger(rounded) ? rounded.toString() : rounded.toString();
+  return rounded.toString();
 }
 
 interface ExpiryStatus {

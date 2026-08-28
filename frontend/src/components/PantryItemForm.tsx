@@ -1,7 +1,13 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
+import { CalendarClock, Layers, Package, Scale, Tag } from "lucide-react";
 import { Button } from "./Button";
+import { Combobox } from "./Combobox";
 import { TextField } from "./TextField";
+import {
+  useDistinctPantryCategories,
+  useDistinctPantryUnits,
+} from "../hooks/usePantryItems";
 import type { PantryItemResponse } from "../types/pantry";
 
 export interface PantryItemFormValues {
@@ -33,6 +39,30 @@ const MAX_NAME = 200;
 const MAX_UNIT = 30;
 const MAX_CATEGORY = 50;
 
+const UNIT_SEEDS = ["pcs", "g", "kg", "ml", "l", "tsp", "tbsp", "cup", "oz", "lb"];
+const CATEGORY_SEEDS = [
+  "dairy",
+  "produce",
+  "meat",
+  "grains",
+  "spices",
+  "frozen",
+  "bakery",
+  "other",
+];
+
+function mergeSuggestions(seeds: string[], userValues: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const v of [...userValues, ...seeds]) {
+    const key = v.trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(v.trim());
+  }
+  return out;
+}
+
 export function PantryItemForm({
   mode,
   initial,
@@ -49,6 +79,18 @@ export function PantryItemForm({
   const [category, setCategory] = useState(initial?.category ?? "");
   const [expiryDate, setExpiryDate] = useState(initial?.expiryDate ?? "");
   const [errors, setErrors] = useState<FieldErrors>({});
+
+  const unitsQuery = useDistinctPantryUnits();
+  const categoriesQuery = useDistinctPantryCategories();
+
+  const unitOptions = useMemo(
+    () => mergeSuggestions(UNIT_SEEDS, unitsQuery.data ?? []),
+    [unitsQuery.data],
+  );
+  const categoryOptions = useMemo(
+    () => mergeSuggestions(CATEGORY_SEEDS, categoriesQuery.data ?? []),
+    [categoriesQuery.data],
+  );
 
   function validate(): FieldErrors {
     const next: FieldErrors = {};
@@ -98,6 +140,7 @@ export function PantryItemForm({
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
       <TextField
         label="Name"
+        icon={Tag}
         value={name}
         onChange={(e) => setName(e.target.value)}
         error={errors.name}
@@ -107,6 +150,7 @@ export function PantryItemForm({
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <TextField
           label="Quantity"
+          icon={Scale}
           type="number"
           inputMode="decimal"
           step="0.001"
@@ -116,25 +160,34 @@ export function PantryItemForm({
           error={errors.quantity}
           required
         />
-        <TextField
+        <Combobox
           label="Unit"
+          icon={Package}
           value={unit}
-          onChange={(e) => setUnit(e.target.value)}
-          error={errors.unit}
+          onChange={setUnit}
+          options={unitOptions}
           placeholder="e.g. L, kg, cans"
+          error={errors.unit}
           required
+          maxLength={MAX_UNIT}
+          data-testid="unit-combobox"
         />
       </div>
-      <TextField
+      <Combobox
         label="Category"
+        icon={Layers}
         value={category}
-        onChange={(e) => setCategory(e.target.value)}
-        error={errors.category}
+        onChange={setCategory}
+        options={categoryOptions}
         placeholder="e.g. Dairy"
+        error={errors.category}
         hint={errors.category ? undefined : "Optional"}
+        maxLength={MAX_CATEGORY}
+        data-testid="category-combobox"
       />
       <TextField
         label="Expiry date"
+        icon={CalendarClock}
         type="date"
         value={expiryDate}
         onChange={(e) => setExpiryDate(e.target.value)}

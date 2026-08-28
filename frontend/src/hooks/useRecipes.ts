@@ -15,6 +15,7 @@ import type {
 
 export const RECIPES_QUERY_KEY = ["recipes"] as const;
 export const DEFAULT_PAGE_SIZE = 20;
+const SUGGESTIONS_PAGE_SIZE = 500;
 
 interface UseRecipesQueryOptions {
   page: number;
@@ -132,5 +133,31 @@ export function useDeleteIngredientMutation() {
       ingredientId: number;
     }) => ingredientsApi.deleteRecipeIngredient(recipeId, ingredientId),
     onSuccess: (_data, variables) => invalidateDetail(variables.recipeId),
+  });
+}
+
+function distinctFrequencySort(values: string[]): string[] {
+  const counts = new Map<string, { key: string; count: number }>();
+  for (const raw of values) {
+    if (!raw) continue;
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    const existing = counts.get(key);
+    if (existing) existing.count += 1;
+    else counts.set(key, { key: trimmed, count: 1 });
+  }
+  return Array.from(counts.values())
+    .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
+    .map((c) => c.key);
+}
+
+export function useDistinctRecipeTags(): UseQueryResult<string[]> {
+  return useQuery({
+    queryKey: [...RECIPES_QUERY_KEY, "list", { page: 0, size: SUGGESTIONS_PAGE_SIZE }],
+    queryFn: () => recipesApi.listRecipes({ page: 0, size: SUGGESTIONS_PAGE_SIZE }),
+    select: (data) =>
+      distinctFrequencySort(data.content.flatMap((r) => r.tags ?? [])),
+    staleTime: 60_000,
   });
 }

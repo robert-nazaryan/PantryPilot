@@ -1,7 +1,6 @@
 import { apiFetch } from "./client";
 import type { PageResponse } from "../types/page";
 import type {
-  ConsumeQuantityRequest,
   CreatePantryItemRequest,
   PantryItemResponse,
   UpdatePantryItemRequest,
@@ -48,16 +47,6 @@ export function updatePantryItem(
   body: UpdatePantryItemRequest,
 ): Promise<PantryItemResponse> {
   return apiFetch<PantryItemResponse>(`/api/pantry-items/${id}`, { method: "PUT", body });
-}
-
-export function consumePantryItem(
-  id: number,
-  body: ConsumeQuantityRequest,
-): Promise<PantryItemResponse> {
-  return apiFetch<PantryItemResponse>(`/api/pantry-items/${id}/consume`, {
-    method: "PATCH",
-    body,
-  });
 }
 
 export function deletePantryItem(id: number): Promise<void> {

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Lock, Mail, User } from "lucide-react";
 import { AuthLayout } from "../components/AuthLayout";
 import { Button } from "../components/Button";
 import { GoogleButton } from "../components/GoogleButton";
@@ -94,6 +95,7 @@ export function RegisterPage(): ReactNode {
       <form onSubmit={handleSubmit} noValidate className="mt-4 flex flex-col gap-4">
         <TextField
           label="Email"
+          icon={Mail}
           type="email"
           autoComplete="email"
           value={email}
@@ -104,6 +106,7 @@ export function RegisterPage(): ReactNode {
         />
         <TextField
           label="Password"
+          icon={Lock}
           type="password"
           autoComplete="new-password"
           value={password}
@@ -114,6 +117,7 @@ export function RegisterPage(): ReactNode {
         />
         <TextField
           label="Display name"
+          icon={User}
           type="text"
           autoComplete="nickname"
           value={displayName}

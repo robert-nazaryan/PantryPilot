@@ -35,7 +35,12 @@ async function register(page, tag) {
 async function fillRecipeForm(page, r) {
   await page.locator('input[placeholder="e.g. Weeknight tomato pasta"]').fill(r.title);
   await page.locator("textarea#recipe-instructions").fill(r.instructions);
-  if (r.cookTime) await page.locator('input[placeholder="e.g. 30"]').fill(String(r.cookTime));
+  if (r.cookTime) {
+    const h = Math.floor(r.cookTime / 60);
+    const m = r.cookTime % 60;
+    if (h) await page.locator('[data-testid="cook-time-hours"]').fill(String(h));
+    if (m) await page.locator('[data-testid="cook-time-minutes"]').fill(String(m));
+  }
   for (const tag of r.tags ?? []) {
     const t = page.locator('[data-testid="tag-input"]');
     await t.fill(tag);
@@ -57,7 +62,11 @@ async function addIngredient(page, ing) {
   await page.waitForSelector('input[placeholder="e.g. Flour"]');
   await page.locator('input[placeholder="e.g. Flour"]').fill(ing.name);
   await page.locator('input[type="number"]').first().fill(String(ing.quantity));
-  if (ing.unit) await page.locator('input[placeholder="e.g. g, cups"]').fill(ing.unit);
+  if (ing.unit) {
+    const unitCombobox = page.locator('[data-testid="ingredient-unit-combobox"]');
+    await unitCombobox.fill(ing.unit);
+    await unitCombobox.press("Tab");
+  }
   await page.locator('[data-testid="submit-ingredient"]').click();
   await page.waitForSelector(`li:has-text("${ing.name}")`);
 }

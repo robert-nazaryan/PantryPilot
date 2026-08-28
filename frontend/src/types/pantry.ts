@@ -25,6 +25,3 @@ export interface UpdatePantryItemRequest {
   expiryDate?: string | null;
 }
 
-export interface ConsumeQuantityRequest {
-  quantity: number;
-}

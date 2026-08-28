@@ -1,10 +1,26 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { Plus } from "lucide-react";
+import { Package, Plus, Scale, Tag } from "lucide-react";
 import { Button } from "./Button";
+import { Combobox } from "./Combobox";
 import { TextField } from "./TextField";
 import { ApiError } from "../api/client";
 import { useAddIngredientMutation } from "../hooks/useRecipes";
+import { useDistinctPantryUnits } from "../hooks/usePantryItems";
+
+const UNIT_SEEDS = ["pcs", "g", "kg", "ml", "l", "tsp", "tbsp", "cup", "oz", "lb"];
+
+function mergeSuggestions(seeds: string[], userValues: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const v of [...userValues, ...seeds]) {
+    const key = v.trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(v.trim());
+  }
+  return out;
+}
 
 interface AddIngredientFormProps {
   recipeId: number;
@@ -16,6 +32,11 @@ const MAX_UNIT = 30;
 export function AddIngredientForm({ recipeId }: AddIngredientFormProps): ReactNode {
   const [open, setOpen] = useState(false);
   const add = useAddIngredientMutation();
+  const unitsQuery = useDistinctPantryUnits();
+  const unitOptions = useMemo(
+    () => mergeSuggestions(UNIT_SEEDS, unitsQuery.data ?? []),
+    [unitsQuery.data],
+  );
 
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -104,6 +125,7 @@ export function AddIngredientForm({ recipeId }: AddIngredientFormProps): ReactNo
       <form onSubmit={handleSubmit} noValidate className="mt-3 flex flex-col gap-3">
         <TextField
           label="Name"
+          icon={Tag}
           value={name}
           onChange={(e) => setName(e.target.value)}
           error={nameError}
@@ -113,6 +135,7 @@ export function AddIngredientForm({ recipeId }: AddIngredientFormProps): ReactNo
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <TextField
             label="Quantity"
+            icon={Scale}
             type="number"
             inputMode="decimal"
             step="0.001"
@@ -122,13 +145,17 @@ export function AddIngredientForm({ recipeId }: AddIngredientFormProps): ReactNo
             error={quantityError}
             required
           />
-          <TextField
+          <Combobox
             label="Unit"
+            icon={Package}
             value={unit}
-            onChange={(e) => setUnit(e.target.value)}
+            onChange={setUnit}
+            options={unitOptions}
             error={unitError}
             placeholder="e.g. g, cups"
             hint={unitError ? undefined : "Optional"}
+            maxLength={30}
+            data-testid="ingredient-unit-combobox"
           />
         </div>
         {submitError && (

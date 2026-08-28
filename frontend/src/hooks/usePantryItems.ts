@@ -3,7 +3,6 @@ import type { UseQueryResult } from "@tanstack/react-query";
 import * as api from "../api/pantryItems";
 import type { PageResponse } from "../types/page";
 import type {
-  ConsumeQuantityRequest,
   CreatePantryItemRequest,
   PantryItemResponse,
   UpdatePantryItemRequest,
@@ -11,6 +10,7 @@ import type {
 
 export const PANTRY_ITEMS_QUERY_KEY = ["pantry-items"] as const;
 export const DEFAULT_PAGE_SIZE = 20;
+const SUGGESTIONS_PAGE_SIZE = 500;
 
 interface UsePantryItemsQueryOptions {
   page: number;
@@ -58,19 +58,45 @@ export function useUpdatePantryItemMutation() {
   });
 }
 
-export function useConsumePantryItemMutation() {
-  const invalidate = useInvalidatePantryLists();
-  return useMutation({
-    mutationFn: ({ id, body }: { id: number; body: ConsumeQuantityRequest }) =>
-      api.consumePantryItem(id, body),
-    onSuccess: () => invalidate(),
-  });
-}
-
 export function useDeletePantryItemMutation() {
   const invalidate = useInvalidatePantryLists();
   return useMutation({
     mutationFn: (id: number) => api.deletePantryItem(id),
     onSuccess: () => invalidate(),
+  });
+}
+
+function distinctFrequencySort(values: string[]): string[] {
+  const counts = new Map<string, { key: string; count: number }>();
+  for (const raw of values) {
+    if (!raw) continue;
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    const existing = counts.get(key);
+    if (existing) existing.count += 1;
+    else counts.set(key, { key: trimmed, count: 1 });
+  }
+  return Array.from(counts.values())
+    .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
+    .map((c) => c.key);
+}
+
+export function useDistinctPantryUnits(): UseQueryResult<string[]> {
+  return useQuery({
+    queryKey: [...PANTRY_ITEMS_QUERY_KEY, "list", { page: 0, size: SUGGESTIONS_PAGE_SIZE }],
+    queryFn: () => api.listPantryItems({ page: 0, size: SUGGESTIONS_PAGE_SIZE }),
+    select: (data) => distinctFrequencySort(data.content.map((i) => i.unit)),
+    staleTime: 60_000,
+  });
+}
+
+export function useDistinctPantryCategories(): UseQueryResult<string[]> {
+  return useQuery({
+    queryKey: [...PANTRY_ITEMS_QUERY_KEY, "list", { page: 0, size: SUGGESTIONS_PAGE_SIZE }],
+    queryFn: () => api.listPantryItems({ page: 0, size: SUGGESTIONS_PAGE_SIZE }),
+    select: (data) =>
+      distinctFrequencySort(data.content.map((i) => i.category ?? "").filter(Boolean)),
+    staleTime: 60_000,
   });
 }
