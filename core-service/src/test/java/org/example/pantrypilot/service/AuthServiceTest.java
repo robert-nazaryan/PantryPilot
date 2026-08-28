@@ -137,13 +137,14 @@ class AuthServiceTest {
 
     @Test
     void loginWithGoogle_existingGoogleUser_issuesTokensNoLinkageWrite() {
-        User user = googleUser(1L, "chef@example.com", "google-sub-1");
+        User user = googleUserWithDisplayName(1L, "chef@example.com", "google-sub-1", "Chef Robert");
         when(userRepository.findByGoogleId("google-sub-1")).thenReturn(Optional.of(user));
         stubTokenIssuance(user);
 
-        TokenPair pair = authService.loginWithGoogle("google-sub-1", "chef@example.com", "Chef");
+        AuthenticatedSession session = authService.loginWithGoogle("google-sub-1", "chef@example.com", "Chef");
 
-        assertTokenPairMatches(pair);
+        assertTokenPairMatches(session.pair());
+        assertThat(session.displayName()).isEqualTo("Chef Robert");
         verify(userRepository, never()).save(any());
         verify(userRepository, never()).findByEmail(any());
     }
@@ -151,14 +152,16 @@ class AuthServiceTest {
     @Test
     void loginWithGoogle_existingEmailPasswordUser_linksGoogleIdAndIssuesTokens() {
         User existing = userWithId(1L, "shared@example.com", "HASHED");
+        existing.setDisplayName("Shared Existing");
         when(userRepository.findByGoogleId("google-sub-2")).thenReturn(Optional.empty());
         when(userRepository.findByEmail("shared@example.com")).thenReturn(Optional.of(existing));
         when(userRepository.save(existing)).thenReturn(existing);
         stubTokenIssuance(existing);
 
-        TokenPair pair = authService.loginWithGoogle("google-sub-2", "shared@example.com", "Shared");
+        AuthenticatedSession session = authService.loginWithGoogle("google-sub-2", "shared@example.com", "Shared");
 
-        assertTokenPairMatches(pair);
+        assertTokenPairMatches(session.pair());
+        assertThat(session.displayName()).isEqualTo("Shared Existing");
         assertThat(existing.getGoogleId()).isEqualTo("google-sub-2");
         assertThat(existing.getPasswordHash()).isEqualTo("HASHED");
         verify(userRepository).save(existing);
@@ -178,9 +181,10 @@ class AuthServiceTest {
         when(refreshTokenGenerator.generate()).thenReturn(RAW_REFRESH);
         when(refreshTokenGenerator.hash(RAW_REFRESH)).thenReturn(HASHED_REFRESH);
 
-        TokenPair pair = authService.loginWithGoogle("google-sub-3", "newbie@example.com", "Newbie");
+        AuthenticatedSession session = authService.loginWithGoogle("google-sub-3", "newbie@example.com", "Newbie");
 
-        assertThat(pair.accessToken()).isEqualTo("ACCESS_TOKEN");
+        assertThat(session.pair().accessToken()).isEqualTo("ACCESS_TOKEN");
+        assertThat(session.displayName()).isEqualTo("Newbie");
         verify(userRepository).save(argThat(u ->
                 "newbie@example.com".equals(u.getEmail())
                         && "google-sub-3".equals(u.getGoogleId())
@@ -306,8 +310,8 @@ class AuthServiceTest {
         return User.builder().id(id).email(email).passwordHash(hash).build();
     }
 
-    private static User googleUser(Long id, String email, String googleId) {
-        return User.builder().id(id).email(email).googleId(googleId).build();
+    private static User googleUserWithDisplayName(Long id, String email, String googleId, String displayName) {
+        return User.builder().id(id).email(email).googleId(googleId).displayName(displayName).build();
     }
 
     private static RefreshToken activeRefreshToken(User user) {

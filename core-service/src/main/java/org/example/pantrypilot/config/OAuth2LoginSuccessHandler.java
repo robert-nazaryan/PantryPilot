@@ -9,7 +9,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import lombok.RequiredArgsConstructor;
 import org.example.pantrypilot.service.AuthService;
-import org.example.pantrypilot.service.TokenPair;
+import org.example.pantrypilot.service.AuthenticatedSession;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -42,15 +42,19 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
             return;
         }
 
-        TokenPair pair = authService.loginWithGoogle(subject, email, name);
+        AuthenticatedSession session = authService.loginWithGoogle(subject, email, name);
         response.addHeader(
                 HttpHeaders.SET_COOKIE,
-                refreshCookieFactory.build(pair.rawRefreshToken(), pair.refreshTokenTtl()).toString());
+                refreshCookieFactory.build(session.pair().rawRefreshToken(), session.pair().refreshTokenTtl()).toString());
 
-        String target = appProperties.url() + "/auth/callback"
-                + "?accessToken=" + urlEncode(pair.accessToken())
-                + "&expiresIn=" + pair.accessTokenTtlSeconds();
-        response.sendRedirect(target);
+        StringBuilder target = new StringBuilder(appProperties.url())
+                .append("/auth/callback")
+                .append("?accessToken=").append(urlEncode(session.pair().accessToken()))
+                .append("&expiresIn=").append(session.pair().accessTokenTtlSeconds());
+        if (session.displayName() != null && !session.displayName().isBlank()) {
+            target.append("&displayName=").append(urlEncode(session.displayName()));
+        }
+        response.sendRedirect(target.toString());
     }
 
     private void redirectToLoginWithError(HttpServletResponse response, String errorCode) throws IOException {

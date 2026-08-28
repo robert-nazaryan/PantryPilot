@@ -11,15 +11,17 @@ export function AuthCallbackPage(): ReactNode {
 
   const accessToken = params.get("accessToken");
   const expiresInRaw = params.get("expiresIn");
+  const displayNameRaw = params.get("displayName");
+  const displayName = displayNameRaw?.trim() ? displayNameRaw : undefined;
   const expiresIn = expiresInRaw ? Number(expiresInRaw) : NaN;
   const paramsValid = accessToken !== null && accessToken.length > 0 && Number.isFinite(expiresIn) && expiresIn > 0;
 
   useEffect(() => {
     if (!paramsValid || adoptedRef.current) return;
     adoptedRef.current = true;
-    adoptSession(accessToken as string, expiresIn);
+    adoptSession(accessToken as string, expiresIn, displayName);
     navigate("/dashboard", { replace: true });
-  }, [paramsValid, accessToken, expiresIn, adoptSession, navigate]);
+  }, [paramsValid, accessToken, expiresIn, displayName, adoptSession, navigate]);
 
   if (!paramsValid) {
     return <Navigate to="/login?error=oauth_callback_missing_token" replace />;

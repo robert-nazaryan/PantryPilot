@@ -56,10 +56,10 @@ public class AuthService {
     }
 
     @Transactional
-    public TokenPair loginWithGoogle(String googleSubject, String email, String displayName) {
+    public AuthenticatedSession loginWithGoogle(String googleSubject, String email, String displayName) {
         User user = userRepository.findByGoogleId(googleSubject)
                 .orElseGet(() -> linkOrCreateGoogleUser(googleSubject, email, displayName));
-        return issueTokenPair(user);
+        return new AuthenticatedSession(issueTokenPair(user), user.getDisplayName());
     }
 
     @Transactional
