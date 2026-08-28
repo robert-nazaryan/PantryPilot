@@ -11,6 +11,8 @@ import { RecipeDetailPage } from "./pages/RecipeDetailPage";
 import { RecipeFormPage } from "./pages/RecipeFormPage";
 import { RecipesPage } from "./pages/RecipesPage";
 import { RegisterPage } from "./pages/RegisterPage";
+import { ShoppingListDetailPage } from "./pages/ShoppingListDetailPage";
+import { ShoppingListsPage } from "./pages/ShoppingListsPage";
 import { useAuth } from "./context/useAuth";
 
 function RedirectIfAuthenticated({ children }: { children: ReactNode }): ReactNode {
@@ -54,6 +56,8 @@ function App(): ReactNode {
         <Route path="/recipes/new" element={<RecipeFormPage mode="create" />} />
         <Route path="/recipes/:id" element={<RecipeDetailPage />} />
         <Route path="/recipes/:id/edit" element={<RecipeFormPage mode="edit" />} />
+        <Route path="/shopping-lists" element={<ShoppingListsPage />} />
+        <Route path="/shopping-lists/:id" element={<ShoppingListDetailPage />} />
       </Route>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

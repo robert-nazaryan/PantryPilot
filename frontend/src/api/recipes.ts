@@ -6,25 +6,7 @@ import type {
   RecipeSummaryResponse,
   UpdateRecipeRequest,
 } from "../types/recipe";
-
-interface ShoppingListItemResponse {
-  id: number;
-  name: string;
-  quantity: number;
-  unit: string | null;
-  checked: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface ShoppingListResponse {
-  id: number;
-  name: string;
-  active: boolean;
-  createdAt: string;
-  updatedAt: string;
-  items: ShoppingListItemResponse[];
-}
+import type { ShoppingListResponse } from "../types/shoppingList";
 
 export interface ListRecipesParams {
   page?: number;

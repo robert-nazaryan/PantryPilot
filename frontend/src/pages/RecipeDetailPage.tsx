@@ -1,7 +1,16 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
-import { BookOpen, ChevronLeft, Clock, Pencil, Trash2, X } from "lucide-react";
+import {
+  BookOpen,
+  ChevronLeft,
+  ClipboardList,
+  Clock,
+  Pencil,
+  Trash2,
+  X,
+} from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
 import { Button } from "../components/Button";
 import { ErrorState } from "../components/ErrorState";
 import { LoadingState } from "../components/LoadingState";
@@ -9,6 +18,7 @@ import { EmptyState } from "../components/EmptyState";
 import { AddIngredientForm } from "../components/AddIngredientForm";
 import { IngredientRow } from "../components/IngredientRow";
 import { ApiError } from "../api/client";
+import { generateShoppingListFromRecipe } from "../api/recipes";
 import {
   useDeleteRecipeMutation,
   useRecipeQuery,
@@ -92,7 +102,11 @@ function RecipeDetailContent({ recipe }: RecipeDetailContentProps): ReactNode {
   const navigate = useNavigate();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [generateError, setGenerateError] = useState<string | null>(null);
   const del = useDeleteRecipeMutation();
+  const generate = useMutation({
+    mutationFn: (recipeId: number) => generateShoppingListFromRecipe(recipeId),
+  });
 
   const tags = recipe.tags ?? [];
 
@@ -110,6 +124,20 @@ function RecipeDetailContent({ recipe }: RecipeDetailContentProps): ReactNode {
         err instanceof ApiError ? err.message : "Couldn't delete. Try again.",
       );
       setConfirmingDelete(false);
+    }
+  }
+
+  async function handleGenerateShoppingList(): Promise<void> {
+    setGenerateError(null);
+    try {
+      const list = await generate.mutateAsync(recipe.id);
+      navigate(`/shopping-lists/${list.id}`);
+    } catch (err) {
+      setGenerateError(
+        err instanceof ApiError
+          ? err.message
+          : "Couldn't generate the shopping list. Try again.",
+      );
     }
   }
 
@@ -199,12 +227,28 @@ function RecipeDetailContent({ recipe }: RecipeDetailContentProps): ReactNode {
           aria-labelledby="ingredients-heading"
           className="flex flex-col gap-3"
         >
-          <h2
-            id="ingredients-heading"
-            className="text-h3 font-semibold text-text-primary dark:text-text-primary-dark"
-          >
-            Ingredients
-          </h2>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <h2
+              id="ingredients-heading"
+              className="text-h3 font-semibold text-text-primary dark:text-text-primary-dark"
+            >
+              Ingredients
+            </h2>
+            <Button
+              variant="secondary"
+              onClick={handleGenerateShoppingList}
+              loading={generate.isPending}
+              data-testid="generate-shopping-list-button"
+            >
+              <ClipboardList className="h-4 w-4" aria-hidden />
+              Generate shopping list
+            </Button>
+          </div>
+          {generateError && (
+            <p role="alert" className="text-body-sm text-warning">
+              {generateError}
+            </p>
+          )}
           {recipe.ingredients.length === 0 ? (
             <p className="text-body-sm text-text-secondary dark:text-text-secondary-dark">
               No ingredients yet. Add one below.

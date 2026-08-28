@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Link, NavLink } from "react-router-dom";
 import {
   BookOpen,
+  ClipboardList,
   LogOut,
   Menu,
   Moon,
@@ -23,12 +24,11 @@ interface NavItem {
   icon: LucideIcon;
 }
 
-// TODO: add { to: "/shopping-lists", label: "Shopping lists", icon: ClipboardList }
-// once that route exists.
 const NAV_ITEMS: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/pantry", label: "Pantry", icon: PackageOpen },
   { to: "/recipes", label: "Recipes", icon: BookOpen },
+  { to: "/shopping-lists", label: "Shopping lists", icon: ClipboardList },
 ];
 
 export function Navbar(): ReactNode {
