@@ -1,0 +1,15 @@
+pantry-pilot.duckdns.org {
+    encode gzip zstd
+
+    @backend {
+        path /api/* /login/oauth2/* /oauth2/*
+    }
+
+    handle @backend {
+        reverse_proxy core-service:8080
+    }
+
+    handle {
+        reverse_proxy frontend:80
+    }
+}

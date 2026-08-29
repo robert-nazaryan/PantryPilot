@@ -1,0 +1,72 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pantrypilot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pantrypilot
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - pantrypilot-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d pantrypilot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  core-service:
+    image: ghcr.io/${GHCR_OWNER}/pantrypilot-core-service:${IMAGE_TAG:-latest}
+    container_name: pantrypilot-core-service
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/pantrypilot
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      APP_CORS_ALLOWED_ORIGINS: https://pantry-pilot.duckdns.org
+      APP_FRONTEND_URL: https://pantry-pilot.duckdns.org
+      AUTH_REFRESH_COOKIE_SECURE: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pantrypilot-net
+
+  frontend:
+    image: ghcr.io/${GHCR_OWNER}/pantrypilot-frontend:${IMAGE_TAG:-latest}
+    container_name: pantrypilot-frontend
+    restart: unless-stopped
+    networks:
+      - pantrypilot-net
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: pantrypilot-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - core-service
+      - frontend
+    networks:
+      - pantrypilot-net
+
+networks:
+  pantrypilot-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

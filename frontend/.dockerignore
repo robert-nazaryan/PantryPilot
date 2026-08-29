@@ -1,0 +1,11 @@
+node_modules
+dist
+.vite
+.env
+.env.*
+screenshots
+scripts
+Dockerfile
+.dockerignore
+CLAUDE.md
+README.md
