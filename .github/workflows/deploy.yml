@@ -23,6 +23,9 @@ jobs:
           java-version: "21"
           cache: maven
 
+      - name: Ensure mvnw is executable
+        run: chmod +x core-service/mvnw
+
       - name: Backend build + PMD + SpotBugs + tests
         working-directory: core-service
         run: ./mvnw --batch-mode --no-transfer-progress clean install
