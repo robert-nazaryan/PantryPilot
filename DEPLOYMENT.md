@@ -1,6 +1,27 @@
 # Deployment
 
-Production runs on a single ARM64 Ubuntu host at `84.235.240.84`, reachable at `https://pantry-pilot.duckdns.org`. Every push to `main` triggers automatic deploy via `.github/workflows/deploy.yml`.
+Production runs on a single ARM64 Ubuntu host at `84.235.240.84`, reachable at `https://pantry-pilot.duckdns.org`. Every push to `master` triggers automatic deploy via `.github/workflows/deploy.yml`.
+
+## Branch convention (CI vs CD split)
+
+- `develop` is the day-to-day work branch. Push to `develop` runs `.github/workflows/ci.yml` — backend tests + PMD + SpotBugs + frontend typecheck + lint. No build-and-push, no deploy, no contact with production.
+- `master` is production. Push to `master` runs `.github/workflows/deploy.yml` — same verification, then multi-arch image build → GHCR push → SSH deploy → post-deploy health check.
+- PRs targeting `master` also run CI, so a `develop → master` PR is verified before merge.
+- Manual re-deploys are still possible via the `workflow_dispatch` trigger on `deploy.yml` (Actions tab → Deploy → Run workflow).
+
+## Promoting `develop` to production
+
+When `develop` is verified and ready to deploy:
+
+```bash
+git switch master
+git pull --ff-only origin master
+git merge --ff-only develop        # fast-forward only; if merge conflict, resolve on develop first
+git push origin master             # triggers deploy.yml automatically
+git switch develop                 # go back to day-to-day branch
+```
+
+Prefer `--ff-only` on the merge so `master`'s history is a clean linear projection of `develop`. If it refuses to fast-forward, that means `master` has diverged (e.g. a hotfix landed there directly) — investigate before forcing anything.
 
 ## Stack
 - **postgres**: 16-alpine, named volume `postgres_data`.
@@ -11,7 +32,7 @@ Production runs on a single ARM64 Ubuntu host at `84.235.240.84`, reachable at `
 ## Build & release model
 CI builds `linux/arm64` images with Docker Buildx (QEMU) on the x86_64 GitHub runner and pushes them to `ghcr.io/<owner>/pantrypilot-core-service` and `ghcr.io/<owner>/pantrypilot-frontend`. Each image is tagged with both the 7-char commit SHA and `latest`. The server only ever *pulls* — no source builds on the host. Roll back with `IMAGE_TAG=<sha> docker compose -f docker-compose.prod.yml up -d`.
 
-## What happens on push to main
+## What happens on push to master
 1. **test** job: `./mvnw clean install` (PMD, SpotBugs, tests) + `npm run typecheck && npm run lint`. Fails the workflow if any step fails — no deploy.
 2. **build-and-push** job: multi-arch (arm64) build of both images, push to GHCR with `<sha>` and `latest` tags, GHA cache scoped per image.
 3. **deploy** job:
