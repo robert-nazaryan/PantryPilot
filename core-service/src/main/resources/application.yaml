@@ -24,6 +24,16 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: false
 
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+        spring.json.type.mapping: userRegistered:org.example.pantrypilot.event.UserRegisteredEvent,pantryItemExpiring:org.example.pantrypilot.event.PantryItemExpiringEvent
+
   security:
     oauth2:
       client:

@@ -18,6 +18,34 @@ services:
       retries: 10
       start_period: 10s
 
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: pantrypilot-kafka
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: "0"
+      KAFKA_PROCESS_ROLES: "controller,broker"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "0@kafka:9093"
+      KAFKA_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      CLUSTER_ID: "pantrypilot-prod-cluster"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - pantrypilot-net
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
   core-service:
     image: ghcr.io/${GHCR_OWNER}/pantrypilot-core-service:${IMAGE_TAG:-latest}
     container_name: pantrypilot-core-service
@@ -32,11 +60,34 @@ services:
       APP_CORS_ALLOWED_ORIGINS: https://pantry-pilot.duckdns.org
       APP_FRONTEND_URL: https://pantry-pilot.duckdns.org
       AUTH_REFRESH_COOKIE_SECURE: "true"
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     depends_on:
       postgres:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
     networks:
       - pantrypilot-net
+
+  notification-service:
+    image: ghcr.io/${GHCR_OWNER}/pantrypilot-notification-service:${IMAGE_TAG:-latest}
+    container_name: pantrypilot-notification-service
+    restart: unless-stopped
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - pantrypilot-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:8081/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
 
   frontend:
     image: ghcr.io/${GHCR_OWNER}/pantrypilot-frontend:${IMAGE_TAG:-latest}
@@ -68,5 +119,6 @@ networks:
 
 volumes:
   postgres_data:
+  kafka_data:
   caddy_data:
   caddy_config:

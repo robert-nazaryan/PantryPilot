@@ -28,4 +28,10 @@ public interface PantryItemRepository extends JpaRepository<PantryItem, Long> {
 
     List<PantryItem> findByUserIdAndExpiryDateLessThanEqualOrderByExpiryDateAsc(
             Long userId, LocalDate end);
+
+    @Query("SELECT p FROM PantryItem p "
+            + "JOIN FETCH p.user u "
+            + "WHERE p.expiryDate IS NOT NULL AND p.expiryDate <= :end "
+            + "ORDER BY u.id ASC, p.expiryDate ASC")
+    List<PantryItem> findAllExpiringByOwner(@Param("end") LocalDate end);
 }

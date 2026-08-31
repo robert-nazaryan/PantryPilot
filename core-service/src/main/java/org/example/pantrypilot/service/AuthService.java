@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.pantrypilot.config.JwtProperties;
 import org.example.pantrypilot.dto.LoginRequest;
 import org.example.pantrypilot.dto.RegisterRequest;
+import org.example.pantrypilot.event.UserRegisteredEvent;
 import org.example.pantrypilot.model.RefreshToken;
 import org.example.pantrypilot.model.User;
 import org.example.pantrypilot.repository.RefreshTokenRepository;
@@ -14,6 +15,7 @@ import org.example.pantrypilot.repository.UserRepository;
 import org.example.pantrypilot.service.exception.EmailAlreadyTakenException;
 import org.example.pantrypilot.service.exception.InvalidCredentialsException;
 import org.example.pantrypilot.service.exception.InvalidRefreshTokenException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +30,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final RefreshTokenGenerator refreshTokenGenerator;
     private final JwtProperties jwtProperties;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public TokenPair register(RegisterRequest req) {
@@ -39,7 +42,10 @@ public class AuthService {
                 .passwordHash(passwordEncoder.encode(req.password()))
                 .displayName(req.displayName())
                 .build();
-        return issueTokenPair(userRepository.save(user));
+        User saved = userRepository.save(user);
+        eventPublisher.publishEvent(
+                UserRegisteredEvent.now(saved.getId(), saved.getEmail(), saved.getDisplayName()));
+        return issueTokenPair(saved);
     }
 
     @Transactional

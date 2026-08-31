@@ -25,7 +25,9 @@ Prefer `--ff-only` on the merge so `master`'s history is a clean linear projecti
 
 ## Stack
 - **postgres**: 16-alpine, named volume `postgres_data`.
-- **core-service**: Spring Boot 4 image, built by CI, pulled from GHCR.
+- **kafka**: bitnami/kafka:3.7 in KRaft mode, named volume `kafka_data`. Internal-only (no port exposed).
+- **core-service**: Spring Boot 4 image, built by CI, pulled from GHCR. Kafka producer.
+- **notification-service**: Spring Boot 4 image, built by CI, pulled from GHCR. Kafka consumer, sends email via Gmail SMTP. Internal-only (no port exposed).
 - **frontend**: Vite build served by nginx:alpine (SPA fallback), image built by CI, pulled from GHCR.
 - **caddy**: 2-alpine reverse proxy, automatic Let's Encrypt HTTPS for `pantry-pilot.duckdns.org`.
 
@@ -59,6 +61,8 @@ Every secret below must be configured in **Repo Settings → Secrets and variabl
 | `DB_PASSWORD` | `openssl rand -base64 24` | Strong random. |
 | `GOOGLE_CLIENT_ID` | Google Cloud Console → APIs & Services → Credentials → your OAuth 2.0 Client ID. | Same OAuth client as local dev — no new client needed. |
 | `GOOGLE_CLIENT_SECRET` | Same Google Cloud entry. | |
+| `MAIL_USERNAME` | Full Gmail address of the sending account (e.g. `pantrypilot.notify@gmail.com`). Also used as the `From:` address on outgoing mail. | notification-service uses this to authenticate with Gmail SMTP. If unset (empty), notification-service still runs — it logs a warning and skips sending. Real send failures are NOT swallowed; they trigger the DLT flow per the kafka-patterns skill. |
+| `MAIL_PASSWORD` | Gmail **App Password** (16 chars, no spaces) generated at https://myaccount.google.com/apppasswords — the sending account must have 2-Step Verification enabled first. Do NOT use the account's login password. | Rotate by regenerating the App Password in Google Account settings and updating this secret. |
 
 `GITHUB_TOKEN` is provided by Actions automatically — no manual step needed. The `packages: write` permission is granted per-job in the workflow so the token can push to GHCR.
 

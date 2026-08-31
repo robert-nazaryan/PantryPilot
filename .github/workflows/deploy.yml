@@ -26,8 +26,15 @@ jobs:
       - name: Ensure mvnw is executable
         run: chmod +x core-service/mvnw
 
-      - name: Backend build + PMD + SpotBugs + tests
+      - name: core-service build + PMD + SpotBugs + tests
         working-directory: core-service
+        run: ./mvnw --batch-mode --no-transfer-progress clean install
+
+      - name: Ensure notification-service mvnw is executable
+        run: chmod +x notification-service/mvnw
+
+      - name: notification-service build + PMD + SpotBugs + tests
+        working-directory: notification-service
         run: ./mvnw --batch-mode --no-transfer-progress clean install
 
       - name: Set up Node
@@ -93,6 +100,20 @@ jobs:
           cache-from: type=gha,scope=core-service
           cache-to: type=gha,scope=core-service,mode=max
 
+      - name: Build & push notification-service
+        uses: docker/build-push-action@v6
+        with:
+          context: ./notification-service
+          file: ./notification-service/Dockerfile
+          platforms: linux/arm64
+          push: true
+          provenance: false
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/pantrypilot-notification-service:${{ steps.meta.outputs.image_tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/pantrypilot-notification-service:latest
+          cache-from: type=gha,scope=notification-service
+          cache-to: type=gha,scope=notification-service,mode=max
+
       - name: Build & push frontend
         uses: docker/build-push-action@v6
         with:
@@ -149,6 +170,8 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
         run: |
           ssh "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
             "cat > ~/pantrypilot/.env" <<EOF
@@ -159,6 +182,8 @@ jobs:
           JWT_SECRET=${JWT_SECRET}
           GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
           GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+          MAIL_USERNAME=${MAIL_USERNAME}
+          MAIL_PASSWORD=${MAIL_PASSWORD}
           EOF
           ssh "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" 'chmod 600 ~/pantrypilot/.env'
 
