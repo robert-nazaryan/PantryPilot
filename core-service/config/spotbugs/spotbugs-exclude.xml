@@ -42,6 +42,13 @@
         <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>
 
+    <!-- AiChatService receives ChatSessionService + UserContextSnapshotBuilder via constructor DI;
+         both are Spring-managed singleton beans, not domain data. -->
+    <Match>
+        <Class name="org.example.pantrypilot.service.AiChatService"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
     <!-- PantryItemExpiringEvent is an immutable event record: its compact constructor stores
          List.copyOf(items), so the internal list is unmodifiable. SpotBugs still flags the
          auto-generated accessor because it cannot statically prove immutability; suppressing

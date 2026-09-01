@@ -1,0 +1,28 @@
+package org.example.pantrypilot.controller;
+
+import jakarta.validation.Valid;
+
+import lombok.RequiredArgsConstructor;
+import org.example.pantrypilot.dto.ChatRequest;
+import org.example.pantrypilot.dto.ChatResponse;
+import org.example.pantrypilot.security.CurrentUserId;
+import org.example.pantrypilot.service.AiChatService;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/ai")
+@RequiredArgsConstructor
+public class ChatController {
+
+    private final AiChatService aiChatService;
+
+    @PostMapping("/chat")
+    public ChatResponse chat(
+            @CurrentUserId Long userId,
+            @Valid @RequestBody ChatRequest request) {
+        return aiChatService.chat(userId, request.sessionId(), request.message());
+    }
+}
