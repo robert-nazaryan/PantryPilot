@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter xmlns="https://github.com/spotbugs/filter/3.0.0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="https://github.com/spotbugs/filter/3.0.0 https://raw.githubusercontent.com/spotbugs/spotbugs/master/spotbugs/etc/findbugsfilter.xsd">
+
+    <!-- Event payloads are immutable record classes carrying data across a Kafka boundary.
+         Java records auto-generate accessors that return internal refs; defensive copying
+         would negate the record's value semantics without a real security benefit here. -->
+    <Match>
+        <Package name="org.example.notification.event"/>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+
+    <!-- Spring @RestController / @Configuration classes receive singleton beans via
+         constructor DI. The "exposed reference" is a Spring-managed service; no external
+         caller ever hands one in, so defensive copying is meaningless here. -->
+    <Match>
+        <Or>
+            <Package name="org.example.notification.controller"/>
+            <Package name="org.example.notification.config"/>
+        </Or>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- NotificationService receives Thymeleaf TemplateEngine via constructor DI; it is a
+         Spring-managed singleton bean, not domain data, so defensive copying does not apply.
+         Same rationale for SmtpEmailClient receiving JavaMailSender via constructor DI. -->
+    <Match>
+        <Or>
+            <Class name="org.example.notification.service.NotificationService"/>
+            <Class name="org.example.notification.service.SmtpEmailClient"/>
+        </Or>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- DltRoutingIntegrationTest is a @Disabled embedded-Kafka integration test kept in the
+         tree for future re-enablement (DltRoutingConfigTest covers the recoverer contract for
+         now). Its byte-array test payloads and ignored poll() call are intentional test scaffolding;
+         suppress SpotBugs here rather than modify a disabled test that is out of scope. -->
+    <Match>
+        <Class name="org.example.notification.consumer.DltRoutingIntegrationTest"/>
+        <Or>
+            <Bug pattern="DM_DEFAULT_ENCODING"/>
+            <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT"/>
+        </Or>
+    </Match>
+
+</FindBugsFilter>

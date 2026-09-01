@@ -35,4 +35,20 @@
         <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>
 
+    <!-- DomainEventPublisher receives KafkaTemplate via constructor DI; it is a Spring-managed
+         singleton bean, not domain data, so defensive copying does not apply. -->
+    <Match>
+        <Class name="org.example.pantrypilot.event.DomainEventPublisher"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- PantryItemExpiringEvent is an immutable event record: its compact constructor stores
+         List.copyOf(items), so the internal list is unmodifiable. SpotBugs still flags the
+         auto-generated accessor because it cannot statically prove immutability; suppressing
+         EI_EXPOSE_REP here preserves record value semantics without weakening safety. -->
+    <Match>
+        <Class name="org.example.pantrypilot.event.PantryItemExpiringEvent"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+
 </FindBugsFilter>

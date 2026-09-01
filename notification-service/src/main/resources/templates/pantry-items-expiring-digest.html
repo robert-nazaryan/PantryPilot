@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Items in your pantry are expiring soon</title>
+</head>
+<body style="margin:0;padding:0;background-color:#FAFAF9;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#292524;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#FAFAF9;padding:32px 16px;">
+        <tr>
+            <td align="center">
+                <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;background-color:#FFFFFF;border:1px solid #E7E5E4;border-radius:12px;overflow:hidden;">
+                    <tr>
+                        <td style="padding:32px 32px 8px 32px;">
+                            <p style="margin:0 0 8px 0;font-size:14px;color:#78716C;letter-spacing:0.08em;text-transform:uppercase;">PantryPilot</p>
+                            <h1 style="margin:0 0 8px 0;font-size:22px;font-weight:600;color:#292524;">
+                                Heads up, <span th:text="${displayName}">friend</span>
+                            </h1>
+                            <p style="margin:0 0 16px 0;font-size:16px;line-height:1.55;color:#292524;">
+                                These items are expiring soon. Use them before they go to waste.
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E7E5E4;border-radius:8px;overflow:hidden;">
+                                <tr th:each="item, iter : ${items}" th:style="'background-color:' + ${iter.odd ? '#FAFAF9' : '#FFFFFF'} + ';'">
+                                    <td style="padding:12px 16px;border-bottom:1px solid #E7E5E4;">
+                                        <div style="font-size:15px;font-weight:500;color:#292524;" th:text="${item.name}">Item name</div>
+                                        <div style="font-size:13px;color:#78716C;margin-top:2px;">
+                                            <span th:text="${item.quantity}">1</span> <span th:text="${item.unit}">unit</span>
+                                            &middot;
+                                            expires <span th:text="${item.expiryDate}">2026-01-01</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:0 32px 32px 32px;">
+                            <p style="margin:0;">
+                                <a href="https://pantry-pilot.duckdns.org/pantry"
+                                   style="display:inline-block;background-color:#D97706;color:#FFFFFF;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:500;font-size:14px;">
+                                    Open your pantry
+                                </a>
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:16px 32px 24px 32px;border-top:1px solid #E7E5E4;">
+                            <p style="margin:0;font-size:12px;color:#78716C;">You received this email because you have items with expiry dates in your PantryPilot pantry.</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

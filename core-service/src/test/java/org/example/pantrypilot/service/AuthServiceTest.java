@@ -7,6 +7,7 @@ import java.util.Optional;
 import org.example.pantrypilot.config.JwtProperties;
 import org.example.pantrypilot.dto.LoginRequest;
 import org.example.pantrypilot.dto.RegisterRequest;
+import org.example.pantrypilot.event.UserRegisteredEvent;
 import org.example.pantrypilot.model.RefreshToken;
 import org.example.pantrypilot.model.User;
 import org.example.pantrypilot.repository.RefreshTokenRepository;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,6 +43,7 @@ class AuthServiceTest {
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private JwtService jwtService;
     @Mock private RefreshTokenGenerator refreshTokenGenerator;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     private final JwtProperties jwtProperties = new JwtProperties("secret", 15L, 7L);
 
@@ -49,7 +52,7 @@ class AuthServiceTest {
     @BeforeEach
     void setUp() {
         authService = new AuthService(userRepository, refreshTokenRepository, passwordEncoder,
-                jwtService, refreshTokenGenerator, jwtProperties);
+                jwtService, refreshTokenGenerator, jwtProperties, eventPublisher);
     }
 
     @Test
@@ -67,6 +70,38 @@ class AuthServiceTest {
         verify(refreshTokenRepository).save(argThat(rt -> rt.getTokenHash().equals(HASHED_REFRESH)
                 && rt.getUser() == saved
                 && rt.getExpiresAt().isAfter(OffsetDateTime.now())));
+    }
+
+    @Test
+    void register_success_publishesUserRegisteredEvent() {
+        final RegisterRequest req = new RegisterRequest("alice@example.com", "password123", "Alice");
+        User saved = userWithId(1L, "alice@example.com", "HASHED");
+        saved.setDisplayName("Alice");
+        when(userRepository.existsByEmail("alice@example.com")).thenReturn(false);
+        when(passwordEncoder.encode("password123")).thenReturn("HASHED");
+        when(userRepository.save(any(User.class))).thenReturn(saved);
+        stubTokenIssuance(saved);
+
+        authService.register(req);
+
+        verify(eventPublisher).publishEvent(argThat((Object ev) ->
+                ev instanceof UserRegisteredEvent e
+                        && e.userId().equals(1L)
+                        && "alice@example.com".equals(e.email())
+                        && "Alice".equals(e.displayName())
+                        && e.eventId() != null
+                        && e.occurredAt() != null));
+    }
+
+    @Test
+    void register_duplicateEmail_doesNotPublishEvent() {
+        when(userRepository.existsByEmail("alice@example.com")).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.register(
+                new RegisterRequest("alice@example.com", "password123", null)))
+                .isInstanceOf(EmailAlreadyTakenException.class);
+
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test
