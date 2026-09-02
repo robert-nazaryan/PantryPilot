@@ -6,5 +6,5 @@ public interface AiProvider {
 
     boolean isAvailable();
 
-    String chat(String systemContext, List<AiChatTurn> history, String userMessage);
+    AiResponse chat(String systemContext, List<AiChatTurn> history, String userMessage);
 }

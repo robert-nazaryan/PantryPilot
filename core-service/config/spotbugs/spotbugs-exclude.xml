@@ -42,11 +42,29 @@
         <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>
 
-    <!-- AiChatService receives ChatSessionService + UserContextSnapshotBuilder via constructor DI;
-         both are Spring-managed singleton beans, not domain data. -->
+    <!-- AiChatService + ChatActionService + ChatActionProposer receive Spring-managed beans
+         (services, ObjectMapper, Validator) via constructor DI; not domain data, so
+         defensive copying does not apply. -->
     <Match>
-        <Class name="org.example.pantrypilot.service.AiChatService"/>
+        <Or>
+            <Class name="org.example.pantrypilot.service.AiChatService"/>
+            <Class name="org.example.pantrypilot.service.ChatActionService"/>
+            <Class name="org.example.pantrypilot.service.ai.ChatActionProposer"/>
+        </Or>
         <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- PantryItemNameResolver.Result wraps a JPA entity + list of entities purely as an
+         internal query-result carrier passed within a single request. Callers do not mutate
+         these references; the record is a value-object shell. Same story as
+         PantryItemExpiringEvent / AiFunctionCall — record semantics without a real
+         defensive-copy benefit. -->
+    <Match>
+        <Class name="org.example.pantrypilot.service.ai.PantryItemNameResolver$Result"/>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
     </Match>
 
     <!-- PantryItemExpiringEvent is an immutable event record: its compact constructor stores
@@ -56,6 +74,16 @@
     <Match>
         <Class name="org.example.pantrypilot.event.PantryItemExpiringEvent"/>
         <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+
+    <!-- AiFunctionCall is an immutable record: its compact constructor stores Map.copyOf(args),
+         so the internal map is unmodifiable. Same story as PantryItemExpiringEvent above. -->
+    <Match>
+        <Class name="org.example.pantrypilot.service.ai.AiFunctionCall"/>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
     </Match>
 
 </FindBugsFilter>

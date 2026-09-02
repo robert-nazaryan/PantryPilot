@@ -17,6 +17,11 @@ public interface PantryItemRepository extends JpaRepository<PantryItem, Long> {
 
     Optional<PantryItem> findByIdAndUserId(Long id, Long userId);
 
+    @Query("SELECT p FROM PantryItem p WHERE p.user.id = :userId "
+            + "AND LOWER(p.name) = LOWER(:name) ORDER BY p.id ASC")
+    List<PantryItem> findByUserIdAndNameIgnoreCase(
+            @Param("userId") Long userId, @Param("name") String name);
+
     @Query(value = "SELECT p FROM PantryItem p WHERE p.user.id = :userId "
             + "ORDER BY p.expiryDate ASC NULLS LAST, p.id ASC",
             countQuery = "SELECT COUNT(p) FROM PantryItem p WHERE p.user.id = :userId")

@@ -3,8 +3,7 @@ import type { UseMutationResult } from "@tanstack/react-query";
 import * as api from "../api/aiChat";
 import { PANTRY_ITEMS_QUERY_KEY } from "./usePantryItems";
 import type { ApiError } from "../api/client";
-import type { ChatRequest, ChatResponse } from "../types/aiChat";
-import type { PantryItemResponse } from "../types/pantry";
+import type { ChatRequest, ChatResponse, ConfirmActionResponse } from "../types/aiChat";
 
 export function useSendChatMessageMutation(): UseMutationResult<
   ChatResponse,
@@ -17,7 +16,7 @@ export function useSendChatMessageMutation(): UseMutationResult<
 }
 
 export function useConfirmChatActionMutation(): UseMutationResult<
-  PantryItemResponse,
+  ConfirmActionResponse,
   ApiError,
   number
 > {

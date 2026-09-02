@@ -6,16 +6,25 @@ import {
   Hash,
   Layers,
   Loader2,
+  Minus,
   Package,
   PenSquare,
+  Pencil,
   Send,
   Sparkles,
   Tag,
+  Trash2,
   X,
 } from "lucide-react";
 import { useConfirmChatActionMutation, useSendChatMessageMutation } from "../hooks/useAiChat";
 import { ApiError } from "../api/client";
-import type { ProposedAction } from "../types/aiChat";
+import type {
+  ConsumePantryItemPayload,
+  CreatePantryItemPayload,
+  DeletePantryItemPayload,
+  ProposedAction,
+  UpdatePantryItemPayload,
+} from "../types/aiChat";
 
 const SESSION_STORAGE_KEY = "pantrypilot.ai.sessionId";
 
@@ -359,7 +368,6 @@ interface ProposedActionCardProps {
 
 function ProposedActionCard({ entry, onConfirm, onDismiss }: ProposedActionCardProps): ReactNode {
   const { action, status } = entry;
-  const payload = action.payload;
   const cardBase =
     "w-full max-w-[95%] rounded-2xl rounded-bl-md border p-3 shadow-sm transition-colors duration-150";
   const cardTone =
@@ -371,53 +379,162 @@ function ProposedActionCard({ entry, onConfirm, onDismiss }: ProposedActionCardP
           ? "border-warning/40 bg-warning/10"
           : "border-border-subtle bg-white dark:border-border-subtle-dark dark:bg-surface-card-dark";
 
+  const { icon: HeaderIcon, title } = actionHeader(action);
+
   return (
     <div className={`${cardBase} ${cardTone}`}>
       <div className="mb-2 flex items-center gap-2">
         <span className="grid h-6 w-6 place-items-center rounded-md bg-primary/10 text-primary dark:bg-primary/15">
-          <Sparkles className="h-3.5 w-3.5" aria-hidden />
+          <HeaderIcon className="h-3.5 w-3.5" aria-hidden />
         </span>
         <p className="text-body-sm font-medium text-text-primary dark:text-text-primary-dark">
-          Add to pantry
+          {title}
         </p>
       </div>
-      <dl className="mb-3 grid grid-cols-[16px_1fr] gap-x-2 gap-y-1 text-body-sm text-text-primary dark:text-text-primary-dark">
-        <Tag className="mt-0.5 h-4 w-4 text-text-secondary dark:text-text-secondary-dark" aria-hidden />
-        <span>
-          <span className="sr-only">Name: </span>
-          {payload.name}
-        </span>
-        <Hash className="mt-0.5 h-4 w-4 text-text-secondary dark:text-text-secondary-dark" aria-hidden />
-        <span>
-          <span className="sr-only">Quantity: </span>
-          {payload.quantity} {payload.unit}
-        </span>
-        {payload.category ? (
-          <>
-            <Layers className="mt-0.5 h-4 w-4 text-text-secondary dark:text-text-secondary-dark" aria-hidden />
-            <span>
-              <span className="sr-only">Category: </span>
-              {payload.category}
-            </span>
-          </>
-        ) : (
-          <>
-            <Package className="mt-0.5 h-4 w-4 text-text-secondary/50 dark:text-text-secondary-dark/50" aria-hidden />
-            <span className="text-text-secondary dark:text-text-secondary-dark">Uncategorized</span>
-          </>
-        )}
-        {payload.expiryDate ? (
-          <>
-            <Calendar className="mt-0.5 h-4 w-4 text-text-secondary dark:text-text-secondary-dark" aria-hidden />
-            <span>
-              <span className="sr-only">Expires: </span>
-              Expires {payload.expiryDate}
-            </span>
-          </>
-        ) : null}
-      </dl>
+      <ActionCardBody action={action} />
       <ActionCardFooter entry={entry} onConfirm={onConfirm} onDismiss={onDismiss} />
     </div>
+  );
+}
+
+type IconType = typeof Sparkles;
+
+function actionHeader(action: ProposedAction): { icon: IconType; title: string } {
+  switch (action.type) {
+    case "CREATE_PANTRY_ITEM":
+      return { icon: Sparkles, title: "Add to pantry" };
+    case "UPDATE_PANTRY_ITEM":
+      return { icon: Pencil, title: "Update pantry item" };
+    case "DELETE_PANTRY_ITEM":
+      return { icon: Trash2, title: "Remove from pantry" };
+    case "CONSUME_PANTRY_ITEM":
+      return { icon: Minus, title: "Use from pantry" };
+  }
+}
+
+function ActionCardBody({ action }: { action: ProposedAction }): ReactNode {
+  switch (action.type) {
+    case "CREATE_PANTRY_ITEM":
+      return <CreateActionBody payload={action.payload} />;
+    case "UPDATE_PANTRY_ITEM":
+      return <UpdateActionBody payload={action.payload} />;
+    case "DELETE_PANTRY_ITEM":
+      return <DeleteActionBody payload={action.payload} />;
+    case "CONSUME_PANTRY_ITEM":
+      return <ConsumeActionBody payload={action.payload} />;
+  }
+}
+
+function CreateActionBody({ payload }: { payload: CreatePantryItemPayload }): ReactNode {
+  return (
+    <dl className="mb-3 grid grid-cols-[16px_1fr] gap-x-2 gap-y-1 text-body-sm text-text-primary dark:text-text-primary-dark">
+      <Tag className="mt-0.5 h-4 w-4 text-text-secondary dark:text-text-secondary-dark" aria-hidden />
+      <span>
+        <span className="sr-only">Name: </span>
+        {payload.name}
+      </span>
+      <Hash className="mt-0.5 h-4 w-4 text-text-secondary dark:text-text-secondary-dark" aria-hidden />
+      <span>
+        <span className="sr-only">Quantity: </span>
+        {payload.quantity} {payload.unit}
+      </span>
+      {payload.category ? (
+        <>
+          <Layers className="mt-0.5 h-4 w-4 text-text-secondary dark:text-text-secondary-dark" aria-hidden />
+          <span>
+            <span className="sr-only">Category: </span>
+            {payload.category}
+          </span>
+        </>
+      ) : (
+        <>
+          <Package className="mt-0.5 h-4 w-4 text-text-secondary/50 dark:text-text-secondary-dark/50" aria-hidden />
+          <span className="text-text-secondary dark:text-text-secondary-dark">Uncategorized</span>
+        </>
+      )}
+      {payload.expiryDate ? (
+        <>
+          <Calendar className="mt-0.5 h-4 w-4 text-text-secondary dark:text-text-secondary-dark" aria-hidden />
+          <span>
+            <span className="sr-only">Expires: </span>
+            Expires {payload.expiryDate}
+          </span>
+        </>
+      ) : null}
+    </dl>
+  );
+}
+
+function UpdateActionBody({ payload }: { payload: UpdatePantryItemPayload }): ReactNode {
+  return (
+    <dl className="mb-3 grid grid-cols-[16px_1fr] gap-x-2 gap-y-1 text-body-sm text-text-primary dark:text-text-primary-dark">
+      <Tag className="mt-0.5 h-4 w-4 text-text-secondary dark:text-text-secondary-dark" aria-hidden />
+      <span>
+        <span className="sr-only">Item: </span>
+        {payload.name}
+      </span>
+      <Hash className="mt-0.5 h-4 w-4 text-text-secondary dark:text-text-secondary-dark" aria-hidden />
+      <span>
+        <span className="sr-only">New quantity: </span>
+        {payload.quantity} {payload.unit}
+      </span>
+      {payload.category ? (
+        <>
+          <Layers className="mt-0.5 h-4 w-4 text-text-secondary dark:text-text-secondary-dark" aria-hidden />
+          <span>
+            <span className="sr-only">Category: </span>
+            {payload.category}
+          </span>
+        </>
+      ) : null}
+      {payload.expiryDate ? (
+        <>
+          <Calendar className="mt-0.5 h-4 w-4 text-text-secondary dark:text-text-secondary-dark" aria-hidden />
+          <span>
+            <span className="sr-only">Expires: </span>
+            Expires {payload.expiryDate}
+          </span>
+        </>
+      ) : null}
+    </dl>
+  );
+}
+
+function DeleteActionBody({ payload }: { payload: DeletePantryItemPayload }): ReactNode {
+  return (
+    <div className="mb-3 flex items-center gap-2 text-body-sm text-text-primary dark:text-text-primary-dark">
+      <Trash2 className="h-4 w-4 text-text-secondary dark:text-text-secondary-dark" aria-hidden />
+      <span>
+        <span className="sr-only">Remove: </span>
+        Remove <span className="font-medium">{payload.name}</span> from your pantry
+      </span>
+    </div>
+  );
+}
+
+function ConsumeActionBody({ payload }: { payload: ConsumePantryItemPayload }): ReactNode {
+  const remaining = Math.max(0, payload.availableQuantity - payload.quantity);
+  const overdraw = payload.quantity > payload.availableQuantity;
+  return (
+    <dl className="mb-3 grid grid-cols-[16px_1fr] gap-x-2 gap-y-1 text-body-sm text-text-primary dark:text-text-primary-dark">
+      <Tag className="mt-0.5 h-4 w-4 text-text-secondary dark:text-text-secondary-dark" aria-hidden />
+      <span>
+        <span className="sr-only">Item: </span>
+        {payload.name}
+      </span>
+      <Minus className="mt-0.5 h-4 w-4 text-text-secondary dark:text-text-secondary-dark" aria-hidden />
+      <span>
+        Use{" "}
+        <span className="font-medium">
+          {payload.quantity} {payload.unit}
+        </span>
+      </span>
+      <Hash className="mt-0.5 h-4 w-4 text-text-secondary dark:text-text-secondary-dark" aria-hidden />
+      <span className={overdraw ? "text-warning" : undefined}>
+        {payload.availableQuantity} {payload.unit} → {remaining} {payload.unit} remaining
+        {overdraw ? " (not enough on hand)" : ""}
+      </span>
+    </dl>
   );
 }
 
@@ -427,12 +544,25 @@ interface ActionCardFooterProps {
   onDismiss: (entry: ActionEntry) => void;
 }
 
+function confirmedLabel(type: ProposedAction["type"]): string {
+  switch (type) {
+    case "CREATE_PANTRY_ITEM":
+      return "Added to your pantry";
+    case "UPDATE_PANTRY_ITEM":
+      return "Updated";
+    case "DELETE_PANTRY_ITEM":
+      return "Removed from your pantry";
+    case "CONSUME_PANTRY_ITEM":
+      return "Consumed";
+  }
+}
+
 function ActionCardFooter({ entry, onConfirm, onDismiss }: ActionCardFooterProps): ReactNode {
   if (entry.status === "confirmed") {
     return (
       <div className="flex items-center gap-2 text-body-sm font-medium text-success">
         <Check className="h-4 w-4" aria-hidden />
-        Added to your pantry
+        {confirmedLabel(entry.action.type)}
       </div>
     );
   }
@@ -526,6 +656,9 @@ function friendlySendError(err: unknown): string {
 
 function friendlyConfirmError(err: unknown): string {
   if (err instanceof ApiError) {
+    if (err.code === "insufficient_quantity") {
+      return "Not enough on hand to consume that much — ask again with a smaller amount.";
+    }
     if (err.code === "stale_chat_action" || err.status === 409) {
       return "This proposal is no longer valid — ask again to try a fresh one.";
     }
@@ -536,5 +669,5 @@ function friendlyConfirmError(err: unknown): string {
       return "Your session expired. Sign in again to confirm.";
     }
   }
-  return "Could not add this item. Please try again.";
+  return "Could not apply this change. Please try again.";
 }
