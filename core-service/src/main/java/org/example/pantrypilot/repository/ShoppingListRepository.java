@@ -1,5 +1,6 @@
 package org.example.pantrypilot.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.example.pantrypilot.model.ShoppingList;
@@ -21,4 +22,9 @@ public interface ShoppingListRepository extends JpaRepository<ShoppingList, Long
             + "WHERE s.id = :id AND s.user.id = :userId")
     Optional<ShoppingList> findByIdAndUserIdWithItems(
             @Param("id") Long id, @Param("userId") Long userId);
+
+    @Query("SELECT s FROM ShoppingList s WHERE s.user.id = :userId "
+            + "AND LOWER(s.name) = LOWER(:name) ORDER BY s.id ASC")
+    List<ShoppingList> findByUserIdAndNameIgnoreCase(
+            @Param("userId") Long userId, @Param("name") String name);
 }

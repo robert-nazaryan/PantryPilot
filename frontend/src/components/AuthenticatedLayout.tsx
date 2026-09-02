@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Outlet } from "react-router-dom";
+import { AiChatButton } from "./AiChatButton";
 import { Navbar } from "./Navbar";
 
 export function AuthenticatedLayout(): ReactNode {
@@ -9,6 +10,7 @@ export function AuthenticatedLayout(): ReactNode {
       <main className="mx-auto max-w-[1200px] px-4 py-6 md:px-6 md:py-10">
         <Outlet />
       </main>
+      <AiChatButton />
     </div>
   );
 }

@@ -61,6 +61,8 @@ services:
       APP_FRONTEND_URL: https://pantry-pilot.duckdns.org
       AUTH_REFRESH_COOKIE_SECURE: "true"
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      AI_CHAT_ENABLED: ${AI_CHAT_ENABLED:-true}
     depends_on:
       postgres:
         condition: service_healthy

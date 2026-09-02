@@ -60,3 +60,12 @@ app:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:}
   frontend:
     url: ${APP_FRONTEND_URL:http://localhost:5173}
+
+ai:
+  chat:
+    enabled: ${AI_CHAT_ENABLED:true}
+
+gemini:
+  api-key: ${GEMINI_API_KEY:}
+  model: ${GEMINI_MODEL:gemini-2.5-flash}
+  api-base-url: ${GEMINI_API_BASE_URL:https://generativelanguage.googleapis.com}
