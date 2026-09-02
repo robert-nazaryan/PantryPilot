@@ -1,5 +1,6 @@
 package org.example.pantrypilot.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.example.pantrypilot.model.Recipe;
@@ -21,4 +22,9 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
             + "WHERE r.id = :id AND r.user.id = :userId")
     Optional<Recipe> findByIdAndUserIdWithIngredients(
             @Param("id") Long id, @Param("userId") Long userId);
+
+    @Query("SELECT r FROM Recipe r WHERE r.user.id = :userId "
+            + "AND LOWER(r.title) = LOWER(:title) ORDER BY r.id ASC")
+    List<Recipe> findByUserIdAndTitleIgnoreCase(
+            @Param("userId") Long userId, @Param("title") String title);
 }

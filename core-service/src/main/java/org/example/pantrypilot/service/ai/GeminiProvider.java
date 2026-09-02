@@ -26,13 +26,20 @@ public class GeminiProvider implements AiProvider {
     public static final String TOOL_UPDATE_PANTRY_ITEM = "update_pantry_item";
     public static final String TOOL_DELETE_PANTRY_ITEM = "delete_pantry_item";
     public static final String TOOL_CONSUME_PANTRY_ITEM = "consume_pantry_item";
+    public static final String TOOL_BULK_DELETE_PANTRY_ITEMS = "bulk_delete_pantry_items";
+    public static final String TOOL_CREATE_SHOPPING_LIST = "create_shopping_list";
+    public static final String TOOL_ADD_SHOPPING_LIST_ITEM = "add_shopping_list_item";
+    public static final String TOOL_REMOVE_SHOPPING_LIST_ITEM = "remove_shopping_list_item";
+    public static final String TOOL_CHECK_SHOPPING_LIST_ITEM = "check_shopping_list_item";
+    public static final String TOOL_UNCHECK_SHOPPING_LIST_ITEM = "uncheck_shopping_list_item";
+    public static final String TOOL_GENERATE_SHOPPING_LIST_FROM_RECIPE = "generate_shopping_list_from_recipe";
+    public static final String TOOL_CREATE_RECIPE = "create_recipe";
+    public static final String TOOL_DELETE_RECIPE = "delete_recipe";
+    public static final String TOOL_ADD_RECIPE_INGREDIENT = "add_recipe_ingredient";
+    public static final String TOOL_REMOVE_RECIPE_INGREDIENT = "remove_recipe_ingredient";
 
     private static final List<Map<String, Object>> TOOL_DECLARATIONS = List.of(Map.of(
-            "functionDeclarations", List.of(
-                    createPantryItemDeclaration(),
-                    updatePantryItemDeclaration(),
-                    deletePantryItemDeclaration(),
-                    consumePantryItemDeclaration())));
+            "functionDeclarations", ToolDeclarations.all()));
 
     private final AiProperties aiProperties;
     private final GeminiProperties geminiProperties;
@@ -74,99 +81,6 @@ public class GeminiProvider implements AiProvider {
                 .body(payload)
                 .retrieve()
                 .body(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() { });
-    }
-
-    private static Map<String, Object> createPantryItemDeclaration() {
-        return Map.of(
-                "name", TOOL_CREATE_PANTRY_ITEM,
-                "description",
-                "Propose adding a single item to the user's pantry. Use this ONLY when the user "
-                        + "clearly asks to add, save, log, or track a pantry item. Do not use it for "
-                        + "suggestions or hypothetical items. The user will see a confirmation card "
-                        + "and must click Confirm before the item is actually created.",
-                "parameters", Map.of(
-                        "type", "object",
-                        "properties", Map.of(
-                                "name", Map.of("type", "string",
-                                        "description", "Name of the item, e.g. 'Milk' or 'Whole wheat flour'."),
-                                "quantity", Map.of("type", "number",
-                                        "description", "Positive numeric quantity, e.g. 2 or 0.5."),
-                                "unit", Map.of("type", "string",
-                                        "description",
-                                        "Unit of measurement. Common values: pcs, g, kg, ml, l, tsp, tbsp, cup, oz, lb."),
-                                "category", Map.of("type", "string",
-                                        "description",
-                                        "Optional category. Common values: dairy, produce, meat, grains, spices, frozen, bakery, other."),
-                                "expiryDate", Map.of("type", "string",
-                                        "description",
-                                        "Optional expiry date in ISO format YYYY-MM-DD. Only include if the user gave one explicitly.")),
-                        "required", List.of("name", "quantity", "unit")));
-    }
-
-    private static Map<String, Object> updatePantryItemDeclaration() {
-        return Map.of(
-                "name", TOOL_UPDATE_PANTRY_ITEM,
-                "description",
-                "Propose updating fields on an existing pantry item the user already owns. Use ONLY "
-                        + "when the user asks to change/rename/edit/set an existing item. Identify the "
-                        + "item by its current name (case-insensitive exact match against the pantry "
-                        + "listed in the system context). Provide only the fields that should change; "
-                        + "omitted fields will keep their current values. The user will see a confirmation "
-                        + "card before the change is applied.",
-                "parameters", Map.of(
-                        "type", "object",
-                        "properties", Map.of(
-                                "name", Map.of("type", "string",
-                                        "description",
-                                        "The current name of the pantry item to update (used to identify it)."),
-                                "quantity", Map.of("type", "number",
-                                        "description",
-                                        "New quantity (>= 0). Omit if the user did not ask to change the quantity."),
-                                "unit", Map.of("type", "string",
-                                        "description",
-                                        "New unit of measurement. Omit if the user did not ask to change the unit."),
-                                "category", Map.of("type", "string",
-                                        "description", "New category. Omit if unchanged."),
-                                "expiryDate", Map.of("type", "string",
-                                        "description", "New expiry date in ISO YYYY-MM-DD. Omit if unchanged.")),
-                        "required", List.of("name")));
-    }
-
-    private static Map<String, Object> deletePantryItemDeclaration() {
-        return Map.of(
-                "name", TOOL_DELETE_PANTRY_ITEM,
-                "description",
-                "Propose removing an existing pantry item entirely. Use ONLY when the user asks to "
-                        + "remove/delete/discard an item. Identify by current name. The user will see a "
-                        + "confirmation card before the item is deleted.",
-                "parameters", Map.of(
-                        "type", "object",
-                        "properties", Map.of(
-                                "name", Map.of("type", "string",
-                                        "description",
-                                        "The current name of the pantry item to delete.")),
-                        "required", List.of("name")));
-    }
-
-    private static Map<String, Object> consumePantryItemDeclaration() {
-        return Map.of(
-                "name", TOOL_CONSUME_PANTRY_ITEM,
-                "description",
-                "Propose reducing the quantity of an existing pantry item (partial consumption). Use "
-                        + "when the user says they used/ate/drank/consumed part of an item. Identify by "
-                        + "current name. The 'quantity' argument is how much to consume, not the "
-                        + "remaining amount. Do not use for full removal — use " + TOOL_DELETE_PANTRY_ITEM
-                        + " for that. The user will see a confirmation card before the change is applied.",
-                "parameters", Map.of(
-                        "type", "object",
-                        "properties", Map.of(
-                                "name", Map.of("type", "string",
-                                        "description",
-                                        "The current name of the pantry item to consume from."),
-                                "quantity", Map.of("type", "number",
-                                        "description",
-                                        "How much to subtract from the current quantity (positive, must not exceed available).")),
-                        "required", List.of("name", "quantity")));
     }
 
     private static Map<String, Object> buildPayload(

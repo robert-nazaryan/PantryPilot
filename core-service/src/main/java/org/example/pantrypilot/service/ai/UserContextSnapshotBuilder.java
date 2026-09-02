@@ -36,7 +36,18 @@ public class UserContextSnapshotBuilder {
                 .append("Answer questions using the user's real data below. ")
                 .append("Be concise, practical, and only suggest recipes the user could plausibly make ")
                 .append("from their pantry (or note what's missing). ")
-                .append("Do not invent items the user does not own.\n\n");
+                .append("Do not invent items the user does not own.\n\n")
+                .append("HOW TO USE TOOLS:\n")
+                .append("- Prefer calling a tool over describing the change in text when the user asks to modify their data.\n")
+                .append("- When identifying an existing item/list/recipe, refer to it by the EXACT name shown below.\n")
+                .append("- When the user's request affects MULTIPLE targets ('all', 'every', 'both', 'empty', 'clear'), ")
+                .append("ALWAYS use a bulk_* tool (e.g. bulk_delete_pantry_items) — never propose individual actions ")
+                .append("one-at-a-time or ask which one when the user clearly meant all/both of them.\n")
+                .append("- When your PREVIOUS turn asked a clarifying question and the current user message ")
+                .append("answers it (e.g. 'both', 'all of them', 'the 1 liter one'), treat it as continuing the ")
+                .append("prior request: emit the appropriate tool call NOW, do not restart the conversation.\n")
+                .append("- Distinguish domains carefully: 'add X to shopping list' means add_shopping_list_item, ")
+                .append("NOT create_pantry_item. 'Add X to pantry' means create_pantry_item.\n\n");
 
         appendPantry(sb, userId);
         appendRecipes(sb, userId);
@@ -53,7 +64,7 @@ public class UserContextSnapshotBuilder {
             sb.append("(empty)\n");
         } else {
             for (PantryItem item : items) {
-                sb.append("- ").append(item.getName())
+                sb.append("- [id=").append(item.getId()).append("] ").append(item.getName())
                         .append(" — ").append(item.getQuantity()).append(' ').append(item.getUnit());
                 if (item.getExpiryDate() != null) {
                     sb.append(" (expires ").append(item.getExpiryDate()).append(')');
@@ -76,7 +87,7 @@ public class UserContextSnapshotBuilder {
             sb.append("(none)\n");
         } else {
             for (Recipe r : recipes) {
-                sb.append("- ").append(r.getTitle());
+                sb.append("- [id=").append(r.getId()).append("] ").append(r.getTitle());
                 if (r.getCookTimeMinutes() != null) {
                     sb.append(" (").append(r.getCookTimeMinutes()).append(" min)");
                 }
@@ -107,7 +118,7 @@ public class UserContextSnapshotBuilder {
                 sb.append("    (+ ").append(ings.size() - shown).append(" more ingredients)\n");
                 break;
             }
-            sb.append("    * ").append(ing.getName());
+            sb.append("    * [id=").append(ing.getId()).append("] ").append(ing.getName());
             if (ing.getQuantity() != null) {
                 sb.append(" — ").append(ing.getQuantity());
                 if (ing.getUnit() != null) {
@@ -124,14 +135,17 @@ public class UserContextSnapshotBuilder {
         var page = shoppingListRepository.findByUserId(
                 userId, PageRequest.of(0, MAX_ACTIVE_SHOPPING_LISTS));
         List<ShoppingList> lists = page.getContent();
-        List<ShoppingList> active = lists.stream().filter(ShoppingList::isActive).toList();
-        if (active.isEmpty()) {
-            sb.append("(no active lists)\n");
+        if (lists.isEmpty()) {
+            sb.append("(no lists)\n");
             return;
         }
-        for (ShoppingList list : active) {
+        for (ShoppingList list : lists) {
             String name = list.getName() != null ? list.getName() : "(unnamed)";
-            sb.append("- ").append(name).append('\n');
+            sb.append("- [id=").append(list.getId()).append("] ").append(name);
+            if (list.isActive()) {
+                sb.append(" (active)");
+            }
+            sb.append('\n');
             appendListItems(sb, list);
         }
     }
@@ -149,7 +163,8 @@ public class UserContextSnapshotBuilder {
                 sb.append("    (+ ").append(items.size() - shown).append(" more items)\n");
                 break;
             }
-            sb.append("    ").append(item.isChecked() ? "[x] " : "[ ] ").append(item.getName());
+            sb.append("    ").append(item.isChecked() ? "[x] " : "[ ] ")
+                    .append("[id=").append(item.getId()).append("] ").append(item.getName());
             if (item.getQuantity() != null) {
                 sb.append(" — ").append(item.getQuantity());
                 if (item.getUnit() != null) {

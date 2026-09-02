@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 import {
+  BookOpen,
   Calendar,
   Check,
+  ChefHat,
+  ClipboardList,
   Hash,
   Layers,
+  ListPlus,
   Loader2,
   Minus,
   Package,
@@ -12,6 +16,8 @@ import {
   Pencil,
   Send,
   Sparkles,
+  Square,
+  SquareCheck,
   Tag,
   Trash2,
   X,
@@ -19,10 +25,20 @@ import {
 import { useConfirmChatActionMutation, useSendChatMessageMutation } from "../hooks/useAiChat";
 import { ApiError } from "../api/client";
 import type {
+  AddRecipeIngredientPayload,
+  AddShoppingListItemPayload,
+  BulkActionPayload,
   ConsumePantryItemPayload,
   CreatePantryItemPayload,
+  CreateRecipePayload,
+  CreateShoppingListPayload,
   DeletePantryItemPayload,
+  DeleteRecipePayload,
+  GenerateShoppingListFromRecipePayload,
   ProposedAction,
+  RemoveRecipeIngredientPayload,
+  RemoveShoppingListItemPayload,
+  SetShoppingListItemCheckedPayload,
   UpdatePantryItemPayload,
 } from "../types/aiChat";
 
@@ -409,7 +425,33 @@ function actionHeader(action: ProposedAction): { icon: IconType; title: string }
       return { icon: Trash2, title: "Remove from pantry" };
     case "CONSUME_PANTRY_ITEM":
       return { icon: Minus, title: "Use from pantry" };
+    case "CREATE_SHOPPING_LIST":
+      return { icon: ClipboardList, title: "Create shopping list" };
+    case "ADD_SHOPPING_LIST_ITEM":
+      return { icon: ListPlus, title: "Add to shopping list" };
+    case "REMOVE_SHOPPING_LIST_ITEM":
+      return { icon: Trash2, title: "Remove from shopping list" };
+    case "CHECK_SHOPPING_LIST_ITEM":
+      return { icon: SquareCheck, title: "Check off shopping item" };
+    case "UNCHECK_SHOPPING_LIST_ITEM":
+      return { icon: Square, title: "Uncheck shopping item" };
+    case "GENERATE_SHOPPING_LIST_FROM_RECIPE":
+      return { icon: ClipboardList, title: "Generate shopping list from recipe" };
+    case "CREATE_RECIPE":
+      return { icon: ChefHat, title: "Save recipe" };
+    case "DELETE_RECIPE":
+      return { icon: Trash2, title: "Delete recipe" };
+    case "ADD_RECIPE_INGREDIENT":
+      return { icon: BookOpen, title: "Add ingredient to recipe" };
+    case "REMOVE_RECIPE_INGREDIENT":
+      return { icon: BookOpen, title: "Remove ingredient from recipe" };
+    case "BULK_ACTION":
+      return { icon: Layers, title: bulkHeaderTitle(action.payload) };
   }
+}
+
+function bulkHeaderTitle(payload: BulkActionPayload): string {
+  return payload.summary || `Apply ${payload.subActionType} to ${payload.targets.length} targets`;
 }
 
 function ActionCardBody({ action }: { action: ProposedAction }): ReactNode {
@@ -422,6 +464,27 @@ function ActionCardBody({ action }: { action: ProposedAction }): ReactNode {
       return <DeleteActionBody payload={action.payload} />;
     case "CONSUME_PANTRY_ITEM":
       return <ConsumeActionBody payload={action.payload} />;
+    case "CREATE_SHOPPING_LIST":
+      return <CreateShoppingListBody payload={action.payload} />;
+    case "ADD_SHOPPING_LIST_ITEM":
+      return <AddShoppingListItemBody payload={action.payload} />;
+    case "REMOVE_SHOPPING_LIST_ITEM":
+      return <RemoveShoppingListItemBody payload={action.payload} />;
+    case "CHECK_SHOPPING_LIST_ITEM":
+    case "UNCHECK_SHOPPING_LIST_ITEM":
+      return <SetShoppingListItemCheckedBody payload={action.payload} />;
+    case "GENERATE_SHOPPING_LIST_FROM_RECIPE":
+      return <GenerateShoppingListFromRecipeBody payload={action.payload} />;
+    case "CREATE_RECIPE":
+      return <CreateRecipeBody payload={action.payload} />;
+    case "DELETE_RECIPE":
+      return <DeleteRecipeBody payload={action.payload} />;
+    case "ADD_RECIPE_INGREDIENT":
+      return <AddRecipeIngredientBody payload={action.payload} />;
+    case "REMOVE_RECIPE_INGREDIENT":
+      return <RemoveRecipeIngredientBody payload={action.payload} />;
+    case "BULK_ACTION":
+      return <BulkActionBody payload={action.payload} />;
   }
 }
 
@@ -554,7 +617,178 @@ function confirmedLabel(type: ProposedAction["type"]): string {
       return "Removed from your pantry";
     case "CONSUME_PANTRY_ITEM":
       return "Consumed";
+    case "CREATE_SHOPPING_LIST":
+      return "Shopping list created";
+    case "ADD_SHOPPING_LIST_ITEM":
+      return "Added to shopping list";
+    case "REMOVE_SHOPPING_LIST_ITEM":
+      return "Removed from shopping list";
+    case "CHECK_SHOPPING_LIST_ITEM":
+      return "Checked off";
+    case "UNCHECK_SHOPPING_LIST_ITEM":
+      return "Unchecked";
+    case "GENERATE_SHOPPING_LIST_FROM_RECIPE":
+      return "Shopping list generated";
+    case "CREATE_RECIPE":
+      return "Recipe saved";
+    case "DELETE_RECIPE":
+      return "Recipe deleted";
+    case "ADD_RECIPE_INGREDIENT":
+      return "Ingredient added";
+    case "REMOVE_RECIPE_INGREDIENT":
+      return "Ingredient removed";
+    case "BULK_ACTION":
+      return "Batch applied";
   }
+}
+
+function CreateShoppingListBody({ payload }: { payload: CreateShoppingListPayload }): ReactNode {
+  return (
+    <div className="mb-3 flex items-center gap-2 text-body-sm text-text-primary dark:text-text-primary-dark">
+      <ClipboardList className="h-4 w-4 text-text-secondary dark:text-text-secondary-dark" aria-hidden />
+      <span>
+        Create list <span className="font-medium">{payload.name?.trim() || "Shopping List"}</span>
+      </span>
+    </div>
+  );
+}
+
+function AddShoppingListItemBody({ payload }: { payload: AddShoppingListItemPayload }): ReactNode {
+  return (
+    <div className="mb-3 flex flex-col gap-1 text-body-sm text-text-primary dark:text-text-primary-dark">
+      <span>
+        Add <span className="font-medium">{payload.name}</span>
+        {payload.quantity != null ? ` — ${payload.quantity}${payload.unit ? ` ${payload.unit}` : ""}` : ""}
+      </span>
+      <span className="text-text-secondary dark:text-text-secondary-dark">
+        to <span className="font-medium">{payload.listName}</span>
+      </span>
+    </div>
+  );
+}
+
+function RemoveShoppingListItemBody({ payload }: { payload: RemoveShoppingListItemPayload }): ReactNode {
+  return (
+    <div className="mb-3 flex flex-col gap-1 text-body-sm text-text-primary dark:text-text-primary-dark">
+      <span>
+        Remove <span className="font-medium">{payload.itemName}</span>
+      </span>
+      <span className="text-text-secondary dark:text-text-secondary-dark">
+        from <span className="font-medium">{payload.listName}</span>
+      </span>
+    </div>
+  );
+}
+
+function SetShoppingListItemCheckedBody({ payload }: { payload: SetShoppingListItemCheckedPayload }): ReactNode {
+  return (
+    <div className="mb-3 flex flex-col gap-1 text-body-sm text-text-primary dark:text-text-primary-dark">
+      <span>
+        {payload.checked ? "Check off" : "Uncheck"} <span className="font-medium">{payload.itemName}</span>
+      </span>
+      <span className="text-text-secondary dark:text-text-secondary-dark">
+        on <span className="font-medium">{payload.listName}</span>
+      </span>
+    </div>
+  );
+}
+
+function GenerateShoppingListFromRecipeBody({ payload }: { payload: GenerateShoppingListFromRecipePayload }): ReactNode {
+  return (
+    <div className="mb-3 flex items-center gap-2 text-body-sm text-text-primary dark:text-text-primary-dark">
+      <ClipboardList className="h-4 w-4 text-text-secondary dark:text-text-secondary-dark" aria-hidden />
+      <span>
+        Generate a new shopping list from <span className="font-medium">{payload.recipeTitle}</span>
+      </span>
+    </div>
+  );
+}
+
+function CreateRecipeBody({ payload }: { payload: CreateRecipePayload }): ReactNode {
+  return (
+    <div className="mb-3 flex flex-col gap-1 text-body-sm text-text-primary dark:text-text-primary-dark">
+      <span>
+        Save recipe <span className="font-medium">{payload.title}</span>
+      </span>
+      {payload.cookTimeMinutes != null ? (
+        <span className="text-text-secondary dark:text-text-secondary-dark">
+          {payload.cookTimeMinutes} min
+        </span>
+      ) : null}
+      {payload.tags && payload.tags.length > 0 ? (
+        <span className="text-text-secondary dark:text-text-secondary-dark">
+          Tags: {payload.tags.join(", ")}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function DeleteRecipeBody({ payload }: { payload: DeleteRecipePayload }): ReactNode {
+  return (
+    <div className="mb-3 flex items-center gap-2 text-body-sm text-text-primary dark:text-text-primary-dark">
+      <Trash2 className="h-4 w-4 text-text-secondary dark:text-text-secondary-dark" aria-hidden />
+      <span>
+        Delete recipe <span className="font-medium">{payload.recipeTitle}</span>
+      </span>
+    </div>
+  );
+}
+
+function AddRecipeIngredientBody({ payload }: { payload: AddRecipeIngredientPayload }): ReactNode {
+  return (
+    <div className="mb-3 flex flex-col gap-1 text-body-sm text-text-primary dark:text-text-primary-dark">
+      <span>
+        Add <span className="font-medium">{payload.name}</span> — {payload.quantity} {payload.unit}
+      </span>
+      <span className="text-text-secondary dark:text-text-secondary-dark">
+        to <span className="font-medium">{payload.recipeTitle}</span>
+      </span>
+    </div>
+  );
+}
+
+function RemoveRecipeIngredientBody({ payload }: { payload: RemoveRecipeIngredientPayload }): ReactNode {
+  return (
+    <div className="mb-3 flex flex-col gap-1 text-body-sm text-text-primary dark:text-text-primary-dark">
+      <span>
+        Remove <span className="font-medium">{payload.ingredientName}</span>
+      </span>
+      <span className="text-text-secondary dark:text-text-secondary-dark">
+        from <span className="font-medium">{payload.recipeTitle}</span>
+      </span>
+    </div>
+  );
+}
+
+function BulkActionBody({ payload }: { payload: BulkActionPayload }): ReactNode {
+  const targets = payload.targets ?? [];
+  return (
+    <div className="mb-3 flex flex-col gap-2 text-body-sm text-text-primary dark:text-text-primary-dark">
+      <span className="font-medium">
+        {payload.summary || `Apply ${payload.subActionType} to ${targets.length} target${targets.length === 1 ? "" : "s"}`}
+      </span>
+      {targets.length > 0 ? (
+        <ul className="ml-4 max-h-40 list-disc space-y-0.5 overflow-y-auto text-text-secondary dark:text-text-secondary-dark">
+          {targets.slice(0, 15).map((t, i) => (
+            <li key={i}>{summarizeBulkTarget(t)}</li>
+          ))}
+          {targets.length > 15 ? (
+            <li className="list-none italic">+ {targets.length - 15} more…</li>
+          ) : null}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function summarizeBulkTarget(target: unknown): string {
+  if (target && typeof target === "object") {
+    const t = target as Record<string, unknown>;
+    const name = (t.name ?? t.itemName ?? t.recipeTitle ?? t.listName) as string | undefined;
+    return name ?? JSON.stringify(target);
+  }
+  return String(target);
 }
 
 function ActionCardFooter({ entry, onConfirm, onDismiss }: ActionCardFooterProps): ReactNode {

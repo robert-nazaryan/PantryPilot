@@ -1,0 +1,20 @@
+ALTER TABLE chat_action DROP CONSTRAINT chat_action_type_chk;
+
+ALTER TABLE chat_action ADD CONSTRAINT chat_action_type_chk
+    CHECK (type IN (
+        'CREATE_PANTRY_ITEM',
+        'UPDATE_PANTRY_ITEM',
+        'DELETE_PANTRY_ITEM',
+        'CONSUME_PANTRY_ITEM',
+        'CREATE_SHOPPING_LIST',
+        'ADD_SHOPPING_LIST_ITEM',
+        'REMOVE_SHOPPING_LIST_ITEM',
+        'CHECK_SHOPPING_LIST_ITEM',
+        'UNCHECK_SHOPPING_LIST_ITEM',
+        'GENERATE_SHOPPING_LIST_FROM_RECIPE',
+        'CREATE_RECIPE',
+        'DELETE_RECIPE',
+        'ADD_RECIPE_INGREDIENT',
+        'REMOVE_RECIPE_INGREDIENT',
+        'BULK_ACTION'
+    ));
