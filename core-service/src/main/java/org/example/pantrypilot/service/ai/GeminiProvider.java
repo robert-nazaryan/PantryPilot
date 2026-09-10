@@ -10,6 +10,7 @@ import org.example.pantrypilot.config.AiProperties;
 import org.example.pantrypilot.config.GeminiProperties;
 import org.example.pantrypilot.model.ChatRole;
 import org.example.pantrypilot.service.exception.AiUnavailableException;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -17,29 +18,14 @@ import org.springframework.web.client.RestClientException;
 
 @Slf4j
 @Component
+@ConditionalOnProperty(name = "ai.provider", havingValue = "gemini", matchIfMissing = true)
 public class GeminiProvider implements AiProvider {
 
     private static final String GEMINI_ROLE_USER = "user";
     private static final String GEMINI_ROLE_MODEL = "model";
 
-    public static final String TOOL_CREATE_PANTRY_ITEM = "create_pantry_item";
-    public static final String TOOL_UPDATE_PANTRY_ITEM = "update_pantry_item";
-    public static final String TOOL_DELETE_PANTRY_ITEM = "delete_pantry_item";
-    public static final String TOOL_CONSUME_PANTRY_ITEM = "consume_pantry_item";
-    public static final String TOOL_BULK_DELETE_PANTRY_ITEMS = "bulk_delete_pantry_items";
-    public static final String TOOL_CREATE_SHOPPING_LIST = "create_shopping_list";
-    public static final String TOOL_ADD_SHOPPING_LIST_ITEM = "add_shopping_list_item";
-    public static final String TOOL_REMOVE_SHOPPING_LIST_ITEM = "remove_shopping_list_item";
-    public static final String TOOL_CHECK_SHOPPING_LIST_ITEM = "check_shopping_list_item";
-    public static final String TOOL_UNCHECK_SHOPPING_LIST_ITEM = "uncheck_shopping_list_item";
-    public static final String TOOL_GENERATE_SHOPPING_LIST_FROM_RECIPE = "generate_shopping_list_from_recipe";
-    public static final String TOOL_CREATE_RECIPE = "create_recipe";
-    public static final String TOOL_DELETE_RECIPE = "delete_recipe";
-    public static final String TOOL_ADD_RECIPE_INGREDIENT = "add_recipe_ingredient";
-    public static final String TOOL_REMOVE_RECIPE_INGREDIENT = "remove_recipe_ingredient";
-
     private static final List<Map<String, Object>> TOOL_DECLARATIONS = List.of(Map.of(
-            "functionDeclarations", ToolDeclarations.all()));
+            "functionDeclarations", AiTools.functionSchemas()));
 
     private final AiProperties aiProperties;
     private final GeminiProperties geminiProperties;
@@ -66,7 +52,7 @@ public class GeminiProvider implements AiProvider {
         Map<String, Object> payload = buildPayload(systemContext, history, userMessage);
         Map<String, Object> response;
         try {
-            response = TransientGeminiRetry.call(() -> callGemini(payload));
+            response = TransientAiRetry.call(() -> callGemini(payload));
         } catch (RestClientException ex) {
             throw new AiUnavailableException("Gemini call failed: " + ex.getMessage(), ex);
         }

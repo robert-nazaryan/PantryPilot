@@ -42,14 +42,15 @@
         <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>
 
-    <!-- AiChatService + ChatActionService + ChatActionProposer receive Spring-managed beans
-         (services, ObjectMapper, Validator) via constructor DI; not domain data, so
-         defensive copying does not apply. -->
+    <!-- AiChatService + ChatActionService + ChatActionProposer + GroqProvider receive
+         Spring-managed beans (services, ObjectMapper, Validator) via constructor DI; not
+         domain data, so defensive copying does not apply. -->
     <Match>
         <Or>
             <Class name="org.example.pantrypilot.service.AiChatService"/>
             <Class name="org.example.pantrypilot.service.ChatActionService"/>
             <Class name="org.example.pantrypilot.service.ai.ChatActionProposer"/>
+            <Class name="org.example.pantrypilot.service.ai.GroqProvider"/>
         </Or>
         <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>

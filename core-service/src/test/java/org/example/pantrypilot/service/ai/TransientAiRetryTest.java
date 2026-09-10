@@ -13,12 +13,12 @@ import org.springframework.web.client.HttpServerErrorException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class TransientGeminiRetryTest {
+class TransientAiRetryTest {
 
     @Test
     void call_returnsResultOnFirstAttemptWithoutSleeping() {
         List<Long> sleeps = new ArrayList<>();
-        String out = TransientGeminiRetry.call(() -> "ok", 3, 100L, sleeps::add);
+        String out = TransientAiRetry.call(() -> "ok", 3, 100L, sleeps::add);
         assertThat(out).isEqualTo("ok");
         assertThat(sleeps).isEmpty();
     }
@@ -35,7 +35,7 @@ class TransientGeminiRetryTest {
         };
         List<Long> sleeps = new ArrayList<>();
 
-        String out = TransientGeminiRetry.call(flaky, 4, 100L, sleeps::add);
+        String out = TransientAiRetry.call(flaky, 4, 100L, sleeps::add);
 
         assertThat(out).isEqualTo("ok on attempt 3");
         assertThat(sleeps).containsExactly(100L, 200L);
@@ -50,7 +50,7 @@ class TransientGeminiRetryTest {
         };
         List<Long> sleeps = new ArrayList<>();
 
-        assertThatThrownBy(() -> TransientGeminiRetry.call(alwaysDown, 3, 100L, sleeps::add))
+        assertThatThrownBy(() -> TransientAiRetry.call(alwaysDown, 3, 100L, sleeps::add))
                 .isInstanceOf(HttpServerErrorException.ServiceUnavailable.class);
 
         assertThat(attempts.get()).isEqualTo(3);
@@ -66,7 +66,7 @@ class TransientGeminiRetryTest {
         };
         List<Long> sleeps = new ArrayList<>();
 
-        assertThatThrownBy(() -> TransientGeminiRetry.call(nonRetryable, 3, 100L, sleeps::add))
+        assertThatThrownBy(() -> TransientAiRetry.call(nonRetryable, 3, 100L, sleeps::add))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(attempts.get()).isEqualTo(1);
         assertThat(sleeps).isEmpty();
@@ -74,7 +74,7 @@ class TransientGeminiRetryTest {
 
     @Test
     void call_zeroMaxAttempts_throwsIllegalArgument() {
-        assertThatThrownBy(() -> TransientGeminiRetry.call(() -> "ok", 0, 100L, ms -> { }))
+        assertThatThrownBy(() -> TransientAiRetry.call(() -> "ok", 0, 100L, ms -> { }))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -85,11 +85,11 @@ class TransientGeminiRetryTest {
             attempts.incrementAndGet();
             throw serviceUnavailable();
         };
-        TransientGeminiRetry.Sleeper interruptor = ms -> {
+        TransientAiRetry.Sleeper interruptor = ms -> {
             throw new InterruptedException("test");
         };
 
-        assertThatThrownBy(() -> TransientGeminiRetry.call(down, 3, 100L, interruptor))
+        assertThatThrownBy(() -> TransientAiRetry.call(down, 3, 100L, interruptor))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Interrupted");
         assertThat(Thread.interrupted()).isTrue();

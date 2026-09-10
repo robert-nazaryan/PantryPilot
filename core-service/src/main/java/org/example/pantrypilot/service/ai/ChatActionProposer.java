@@ -77,21 +77,21 @@ public class ChatActionProposer {
 
     public Outcome propose(Long userId, ChatSession session, AiFunctionCall call) {
         return switch (call.name()) {
-            case GeminiProvider.TOOL_CREATE_PANTRY_ITEM -> proposeCreatePantryItem(session, call);
-            case GeminiProvider.TOOL_UPDATE_PANTRY_ITEM -> proposeUpdatePantryItem(userId, session, call);
-            case GeminiProvider.TOOL_DELETE_PANTRY_ITEM -> proposeDeletePantryItem(userId, session, call);
-            case GeminiProvider.TOOL_CONSUME_PANTRY_ITEM -> proposeConsumePantryItem(userId, session, call);
-            case GeminiProvider.TOOL_BULK_DELETE_PANTRY_ITEMS -> proposeBulkDeletePantryItems(userId, session, call);
-            case GeminiProvider.TOOL_CREATE_SHOPPING_LIST -> proposeCreateShoppingList(session, call);
-            case GeminiProvider.TOOL_ADD_SHOPPING_LIST_ITEM -> proposeAddShoppingListItem(userId, session, call);
-            case GeminiProvider.TOOL_REMOVE_SHOPPING_LIST_ITEM -> proposeRemoveShoppingListItem(userId, session, call);
-            case GeminiProvider.TOOL_CHECK_SHOPPING_LIST_ITEM -> proposeSetShoppingListItemChecked(userId, session, call, true);
-            case GeminiProvider.TOOL_UNCHECK_SHOPPING_LIST_ITEM -> proposeSetShoppingListItemChecked(userId, session, call, false);
-            case GeminiProvider.TOOL_GENERATE_SHOPPING_LIST_FROM_RECIPE -> proposeGenerateShoppingListFromRecipe(userId, session, call);
-            case GeminiProvider.TOOL_CREATE_RECIPE -> proposeCreateRecipe(session, call);
-            case GeminiProvider.TOOL_DELETE_RECIPE -> proposeDeleteRecipe(userId, session, call);
-            case GeminiProvider.TOOL_ADD_RECIPE_INGREDIENT -> proposeAddRecipeIngredient(userId, session, call);
-            case GeminiProvider.TOOL_REMOVE_RECIPE_INGREDIENT -> proposeRemoveRecipeIngredient(userId, session, call);
+            case AiTools.TOOL_CREATE_PANTRY_ITEM -> proposeCreatePantryItem(session, call);
+            case AiTools.TOOL_UPDATE_PANTRY_ITEM -> proposeUpdatePantryItem(userId, session, call);
+            case AiTools.TOOL_DELETE_PANTRY_ITEM -> proposeDeletePantryItem(userId, session, call);
+            case AiTools.TOOL_CONSUME_PANTRY_ITEM -> proposeConsumePantryItem(userId, session, call);
+            case AiTools.TOOL_BULK_DELETE_PANTRY_ITEMS -> proposeBulkDeletePantryItems(userId, session, call);
+            case AiTools.TOOL_CREATE_SHOPPING_LIST -> proposeCreateShoppingList(session, call);
+            case AiTools.TOOL_ADD_SHOPPING_LIST_ITEM -> proposeAddShoppingListItem(userId, session, call);
+            case AiTools.TOOL_REMOVE_SHOPPING_LIST_ITEM -> proposeRemoveShoppingListItem(userId, session, call);
+            case AiTools.TOOL_CHECK_SHOPPING_LIST_ITEM -> proposeSetShoppingListItemChecked(userId, session, call, true);
+            case AiTools.TOOL_UNCHECK_SHOPPING_LIST_ITEM -> proposeSetShoppingListItemChecked(userId, session, call, false);
+            case AiTools.TOOL_GENERATE_SHOPPING_LIST_FROM_RECIPE -> proposeGenerateShoppingListFromRecipe(userId, session, call);
+            case AiTools.TOOL_CREATE_RECIPE -> proposeCreateRecipe(session, call);
+            case AiTools.TOOL_DELETE_RECIPE -> proposeDeleteRecipe(userId, session, call);
+            case AiTools.TOOL_ADD_RECIPE_INGREDIENT -> proposeAddRecipeIngredient(userId, session, call);
+            case AiTools.TOOL_REMOVE_RECIPE_INGREDIENT -> proposeRemoveRecipeIngredient(userId, session, call);
             default -> {
                 log.warn("Ignoring unknown function call from model: {}", call.name());
                 yield Outcome.none();

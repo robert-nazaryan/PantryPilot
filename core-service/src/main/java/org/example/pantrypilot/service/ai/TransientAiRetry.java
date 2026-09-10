@@ -4,12 +4,12 @@ import java.util.function.Supplier;
 
 import org.springframework.web.client.HttpServerErrorException;
 
-final class TransientGeminiRetry {
+final class TransientAiRetry {
 
     static final int DEFAULT_MAX_ATTEMPTS = 4;
     static final long DEFAULT_INITIAL_BACKOFF_MS = 500L;
 
-    private TransientGeminiRetry() {
+    private TransientAiRetry() {
     }
 
     static <T> T call(Supplier<T> attempt) {
@@ -34,7 +34,7 @@ final class TransientGeminiRetry {
                     sleeper.pause(backoff);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
-                    throw new IllegalStateException("Interrupted while backing off from Gemini 503", ie);
+                    throw new IllegalStateException("Interrupted while backing off from AI provider 503", ie);
                 }
             }
         }
