@@ -4,15 +4,32 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Static holder for Gemini function-calling tool declarations. Extracted from GeminiProvider so
- * each domain (pantry / shopping list / recipe / bulk) can be described in one focused place.
+ * Provider-agnostic tool-name constants and function-schema declarations. Each provider
+ * (Gemini / Groq / …) consumes {@link #functionSchemas()} and wraps it in its own outer
+ * request shape.
  */
-final class ToolDeclarations {
+public final class AiTools {
 
-    private ToolDeclarations() {
+    public static final String TOOL_CREATE_PANTRY_ITEM = "create_pantry_item";
+    public static final String TOOL_UPDATE_PANTRY_ITEM = "update_pantry_item";
+    public static final String TOOL_DELETE_PANTRY_ITEM = "delete_pantry_item";
+    public static final String TOOL_CONSUME_PANTRY_ITEM = "consume_pantry_item";
+    public static final String TOOL_BULK_DELETE_PANTRY_ITEMS = "bulk_delete_pantry_items";
+    public static final String TOOL_CREATE_SHOPPING_LIST = "create_shopping_list";
+    public static final String TOOL_ADD_SHOPPING_LIST_ITEM = "add_shopping_list_item";
+    public static final String TOOL_REMOVE_SHOPPING_LIST_ITEM = "remove_shopping_list_item";
+    public static final String TOOL_CHECK_SHOPPING_LIST_ITEM = "check_shopping_list_item";
+    public static final String TOOL_UNCHECK_SHOPPING_LIST_ITEM = "uncheck_shopping_list_item";
+    public static final String TOOL_GENERATE_SHOPPING_LIST_FROM_RECIPE = "generate_shopping_list_from_recipe";
+    public static final String TOOL_CREATE_RECIPE = "create_recipe";
+    public static final String TOOL_DELETE_RECIPE = "delete_recipe";
+    public static final String TOOL_ADD_RECIPE_INGREDIENT = "add_recipe_ingredient";
+    public static final String TOOL_REMOVE_RECIPE_INGREDIENT = "remove_recipe_ingredient";
+
+    private AiTools() {
     }
 
-    static List<Map<String, Object>> all() {
+    public static List<Map<String, Object>> functionSchemas() {
         return List.of(
                 createPantryItem(),
                 updatePantryItem(),
@@ -31,10 +48,8 @@ final class ToolDeclarations {
                 removeRecipeIngredient());
     }
 
-    // ---------- Pantry ----------
-
     private static Map<String, Object> createPantryItem() {
-        return decl(GeminiProvider.TOOL_CREATE_PANTRY_ITEM,
+        return decl(TOOL_CREATE_PANTRY_ITEM,
                 "Propose adding a single item to the user's pantry (NOT to a shopping list). "
                         + "Use ONLY when the user clearly asks to add/save/log/track a pantry item. "
                         + "For shopping list items use add_shopping_list_item instead. "
@@ -50,7 +65,7 @@ final class ToolDeclarations {
     }
 
     private static Map<String, Object> updatePantryItem() {
-        return decl(GeminiProvider.TOOL_UPDATE_PANTRY_ITEM,
+        return decl(TOOL_UPDATE_PANTRY_ITEM,
                 "Propose updating fields on an existing pantry item. Identify by current name "
                         + "(case-insensitive exact match against the pantry listed in the system context). "
                         + "Provide only the fields that should change; omitted fields keep current values.",
@@ -64,7 +79,7 @@ final class ToolDeclarations {
     }
 
     private static Map<String, Object> deletePantryItem() {
-        return decl(GeminiProvider.TOOL_DELETE_PANTRY_ITEM,
+        return decl(TOOL_DELETE_PANTRY_ITEM,
                 "Propose removing an ONE existing pantry item entirely. For removing multiple items "
                         + "or emptying the pantry, use bulk_delete_pantry_items instead. Identify by current name.",
                 Map.of("name", str("The current name of the pantry item to delete.")),
@@ -72,7 +87,7 @@ final class ToolDeclarations {
     }
 
     private static Map<String, Object> consumePantryItem() {
-        return decl(GeminiProvider.TOOL_CONSUME_PANTRY_ITEM,
+        return decl(TOOL_CONSUME_PANTRY_ITEM,
                 "Propose reducing the quantity of an existing pantry item (partial consumption). Use "
                         + "when the user says they used/ate/drank/consumed part of an item. The 'quantity' "
                         + "argument is how much to consume, not the remaining amount.",
@@ -83,7 +98,7 @@ final class ToolDeclarations {
     }
 
     private static Map<String, Object> bulkDeletePantryItems() {
-        return decl(GeminiProvider.TOOL_BULK_DELETE_PANTRY_ITEMS,
+        return decl(TOOL_BULK_DELETE_PANTRY_ITEMS,
                 "Propose removing MULTIPLE pantry items in one batch. Use whenever the user asks to "
                         + "empty/clear/remove-all/etc. or when they answer 'both' / 'all of them' to a "
                         + "clarifying question about duplicate names. This produces ONE confirmation "
@@ -98,17 +113,15 @@ final class ToolDeclarations {
                 List.of("scope"));
     }
 
-    // ---------- Shopping lists ----------
-
     private static Map<String, Object> createShoppingList() {
-        return decl(GeminiProvider.TOOL_CREATE_SHOPPING_LIST,
+        return decl(TOOL_CREATE_SHOPPING_LIST,
                 "Propose creating a new empty shopping list. Use when the user asks to start/create a list.",
                 Map.of("name", str("Optional list name. If omitted the system uses 'Shopping List'.")),
                 List.of());
     }
 
     private static Map<String, Object> addShoppingListItem() {
-        return decl(GeminiProvider.TOOL_ADD_SHOPPING_LIST_ITEM,
+        return decl(TOOL_ADD_SHOPPING_LIST_ITEM,
                 "Propose adding an item to an existing shopping list. Use when the user asks to add "
                         + "something TO A SHOPPING LIST (not to their pantry). Prefer listId if you can "
                         + "read it from the system context; otherwise pass listName. If no list exists yet "
@@ -123,7 +136,7 @@ final class ToolDeclarations {
     }
 
     private static Map<String, Object> removeShoppingListItem() {
-        return decl(GeminiProvider.TOOL_REMOVE_SHOPPING_LIST_ITEM,
+        return decl(TOOL_REMOVE_SHOPPING_LIST_ITEM,
                 "Propose removing an item from a shopping list.",
                 Map.of(
                         "listId", num("The [id=N] of the target list."),
@@ -134,7 +147,7 @@ final class ToolDeclarations {
     }
 
     private static Map<String, Object> checkShoppingListItem() {
-        return decl(GeminiProvider.TOOL_CHECK_SHOPPING_LIST_ITEM,
+        return decl(TOOL_CHECK_SHOPPING_LIST_ITEM,
                 "Propose marking a shopping list item as checked/bought.",
                 Map.of(
                         "listId", num("Target list id."),
@@ -145,7 +158,7 @@ final class ToolDeclarations {
     }
 
     private static Map<String, Object> uncheckShoppingListItem() {
-        return decl(GeminiProvider.TOOL_UNCHECK_SHOPPING_LIST_ITEM,
+        return decl(TOOL_UNCHECK_SHOPPING_LIST_ITEM,
                 "Propose marking a shopping list item as unchecked.",
                 Map.of(
                         "listId", num("Target list id."),
@@ -156,7 +169,7 @@ final class ToolDeclarations {
     }
 
     private static Map<String, Object> generateShoppingListFromRecipe() {
-        return decl(GeminiProvider.TOOL_GENERATE_SHOPPING_LIST_FROM_RECIPE,
+        return decl(TOOL_GENERATE_SHOPPING_LIST_FROM_RECIPE,
                 "Propose creating a new shopping list from an existing saved recipe's ingredients. "
                         + "Identify the recipe by recipeId (preferred) or recipeTitle. This will create a "
                         + "new list, not merge into an existing one.",
@@ -166,10 +179,8 @@ final class ToolDeclarations {
                 List.of());
     }
 
-    // ---------- Recipes ----------
-
     private static Map<String, Object> createRecipe() {
-        return decl(GeminiProvider.TOOL_CREATE_RECIPE,
+        return decl(TOOL_CREATE_RECIPE,
                 "Propose saving a new recipe. Ingredients are NOT part of this call — after the recipe "
                         + "is created, use add_recipe_ingredient separately for each ingredient.",
                 Map.of(
@@ -183,7 +194,7 @@ final class ToolDeclarations {
     }
 
     private static Map<String, Object> deleteRecipe() {
-        return decl(GeminiProvider.TOOL_DELETE_RECIPE,
+        return decl(TOOL_DELETE_RECIPE,
                 "Propose deleting a saved recipe.",
                 Map.of(
                         "recipeId", num("Recipe id."),
@@ -192,7 +203,7 @@ final class ToolDeclarations {
     }
 
     private static Map<String, Object> addRecipeIngredient() {
-        return decl(GeminiProvider.TOOL_ADD_RECIPE_INGREDIENT,
+        return decl(TOOL_ADD_RECIPE_INGREDIENT,
                 "Propose adding an ingredient to a saved recipe.",
                 Map.of(
                         "recipeId", num("Recipe id."),
@@ -204,7 +215,7 @@ final class ToolDeclarations {
     }
 
     private static Map<String, Object> removeRecipeIngredient() {
-        return decl(GeminiProvider.TOOL_REMOVE_RECIPE_INGREDIENT,
+        return decl(TOOL_REMOVE_RECIPE_INGREDIENT,
                 "Propose removing an ingredient from a saved recipe.",
                 Map.of(
                         "recipeId", num("Recipe id."),
@@ -213,8 +224,6 @@ final class ToolDeclarations {
                         "ingredientName", str("Ingredient name (if id not given).")),
                 List.of());
     }
-
-    // ---------- Schema helpers ----------
 
     private static Map<String, Object> decl(String name, String description,
                                             Map<String, Object> properties, List<String> required) {

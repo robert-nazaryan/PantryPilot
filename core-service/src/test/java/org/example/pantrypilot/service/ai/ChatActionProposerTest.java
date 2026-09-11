@@ -71,7 +71,7 @@ class ChatActionProposerTest {
 
     @Test
     void propose_createTool_parsesArgsAndPersists() {
-        AiFunctionCall call = new AiFunctionCall(GeminiProvider.TOOL_CREATE_PANTRY_ITEM, Map.of(
+        AiFunctionCall call = new AiFunctionCall(AiTools.TOOL_CREATE_PANTRY_ITEM, Map.of(
                 "name", "Milk",
                 "quantity", 2,
                 "unit", "L",
@@ -98,7 +98,7 @@ class ChatActionProposerTest {
                 .thenReturn(PantryItemNameResolver.Result.found(existing));
         stubPersist(ChatActionType.UPDATE_PANTRY_ITEM);
 
-        AiFunctionCall call = new AiFunctionCall(GeminiProvider.TOOL_UPDATE_PANTRY_ITEM, Map.of(
+        AiFunctionCall call = new AiFunctionCall(AiTools.TOOL_UPDATE_PANTRY_ITEM, Map.of(
                 "name", "Milk", "quantity", 3));
 
         ChatActionProposer.Outcome outcome = proposer.propose(USER_ID, session, call);
@@ -120,7 +120,7 @@ class ChatActionProposerTest {
                 .thenReturn(PantryItemNameResolver.Result.found(existing));
         stubPersist(ChatActionType.DELETE_PANTRY_ITEM);
 
-        AiFunctionCall call = new AiFunctionCall(GeminiProvider.TOOL_DELETE_PANTRY_ITEM, Map.of("name", "Cola"));
+        AiFunctionCall call = new AiFunctionCall(AiTools.TOOL_DELETE_PANTRY_ITEM, Map.of("name", "Cola"));
 
         ChatActionProposer.Outcome outcome = proposer.propose(USER_ID, session, call);
 
@@ -137,7 +137,7 @@ class ChatActionProposerTest {
                 .thenReturn(PantryItemNameResolver.Result.found(existing));
         stubPersist(ChatActionType.CONSUME_PANTRY_ITEM);
 
-        AiFunctionCall call = new AiFunctionCall(GeminiProvider.TOOL_CONSUME_PANTRY_ITEM, Map.of(
+        AiFunctionCall call = new AiFunctionCall(AiTools.TOOL_CONSUME_PANTRY_ITEM, Map.of(
                 "name", "Water", "quantity", 1));
 
         ChatActionProposer.Outcome outcome = proposer.propose(USER_ID, session, call);
@@ -153,7 +153,7 @@ class ChatActionProposerTest {
     void propose_updateTool_whenItemNotFound_returnsClarificationInsteadOfProposal() {
         when(nameResolver.resolve(USER_ID, "Zebra"))
                 .thenReturn(PantryItemNameResolver.Result.notFound());
-        AiFunctionCall call = new AiFunctionCall(GeminiProvider.TOOL_UPDATE_PANTRY_ITEM, Map.of(
+        AiFunctionCall call = new AiFunctionCall(AiTools.TOOL_UPDATE_PANTRY_ITEM, Map.of(
                 "name", "Zebra", "quantity", 1));
 
         ChatActionProposer.Outcome outcome = proposer.propose(USER_ID, session, call);
@@ -169,7 +169,7 @@ class ChatActionProposerTest {
         PantryItem b = PantryItem.builder().id(2L).name("Milk").quantity(BigDecimal.valueOf(1)).unit("L").build();
         when(nameResolver.resolve(USER_ID, "Milk"))
                 .thenReturn(PantryItemNameResolver.Result.ambiguous(List.of(a, b)));
-        AiFunctionCall call = new AiFunctionCall(GeminiProvider.TOOL_DELETE_PANTRY_ITEM, Map.of("name", "Milk"));
+        AiFunctionCall call = new AiFunctionCall(AiTools.TOOL_DELETE_PANTRY_ITEM, Map.of("name", "Milk"));
 
         ChatActionProposer.Outcome outcome = proposer.propose(USER_ID, session, call);
 
@@ -185,7 +185,7 @@ class ChatActionProposerTest {
         when(nameResolver.resolve(USER_ID, "Water"))
                 .thenReturn(PantryItemNameResolver.Result.found(existing));
 
-        AiFunctionCall call = new AiFunctionCall(GeminiProvider.TOOL_CONSUME_PANTRY_ITEM, Map.of(
+        AiFunctionCall call = new AiFunctionCall(AiTools.TOOL_CONSUME_PANTRY_ITEM, Map.of(
                 "name", "Water", "quantity", 0));
 
         ChatActionProposer.Outcome outcome = proposer.propose(USER_ID, session, call);
@@ -219,7 +219,7 @@ class ChatActionProposerTest {
         stubPersist(ChatActionType.BULK_ACTION);
 
         AiFunctionCall call = new AiFunctionCall(
-                GeminiProvider.TOOL_BULK_DELETE_PANTRY_ITEMS, Map.of("scope", "all"));
+                AiTools.TOOL_BULK_DELETE_PANTRY_ITEMS, Map.of("scope", "all"));
 
         ChatActionProposer.Outcome outcome = proposer.propose(USER_ID, session, call);
 
@@ -240,7 +240,7 @@ class ChatActionProposerTest {
                 .thenReturn(List.of(milk1, milk2));
         stubPersist(ChatActionType.BULK_ACTION);
 
-        AiFunctionCall call = new AiFunctionCall(GeminiProvider.TOOL_BULK_DELETE_PANTRY_ITEMS,
+        AiFunctionCall call = new AiFunctionCall(AiTools.TOOL_BULK_DELETE_PANTRY_ITEMS,
                 Map.of("scope", "byName", "nameFilter", "Milk"));
 
         ChatActionProposer.Outcome outcome = proposer.propose(USER_ID, session, call);
@@ -254,7 +254,7 @@ class ChatActionProposerTest {
     void propose_bulkDeletePantryItems_noMatches_returnsClarification() {
         when(pantryItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "Ghost"))
                 .thenReturn(List.of());
-        AiFunctionCall call = new AiFunctionCall(GeminiProvider.TOOL_BULK_DELETE_PANTRY_ITEMS,
+        AiFunctionCall call = new AiFunctionCall(AiTools.TOOL_BULK_DELETE_PANTRY_ITEMS,
                 Map.of("scope", "byName", "nameFilter", "Ghost"));
 
         ChatActionProposer.Outcome outcome = proposer.propose(USER_ID, session, call);
@@ -267,7 +267,7 @@ class ChatActionProposerTest {
     void propose_createShoppingList_persistsWithName() {
         stubPersist(ChatActionType.CREATE_SHOPPING_LIST);
         AiFunctionCall call = new AiFunctionCall(
-                GeminiProvider.TOOL_CREATE_SHOPPING_LIST, Map.of("name", "Groceries"));
+                AiTools.TOOL_CREATE_SHOPPING_LIST, Map.of("name", "Groceries"));
 
         ChatActionProposer.Outcome outcome = proposer.propose(USER_ID, session, call);
 
@@ -284,7 +284,7 @@ class ChatActionProposerTest {
                 .thenReturn(List.of(list));
         stubPersist(ChatActionType.ADD_SHOPPING_LIST_ITEM);
 
-        AiFunctionCall call = new AiFunctionCall(GeminiProvider.TOOL_ADD_SHOPPING_LIST_ITEM, Map.of(
+        AiFunctionCall call = new AiFunctionCall(AiTools.TOOL_ADD_SHOPPING_LIST_ITEM, Map.of(
                 "listName", "Groceries", "name", "Pepperoni", "quantity", 200, "unit", "g"));
 
         ChatActionProposer.Outcome outcome = proposer.propose(USER_ID, session, call);
@@ -301,7 +301,7 @@ class ChatActionProposerTest {
     void propose_addShoppingListItem_unknownList_returnsClarification() {
         when(shoppingListRepository.findByUserIdAndNameIgnoreCase(USER_ID, "Nope"))
                 .thenReturn(List.of());
-        AiFunctionCall call = new AiFunctionCall(GeminiProvider.TOOL_ADD_SHOPPING_LIST_ITEM, Map.of(
+        AiFunctionCall call = new AiFunctionCall(AiTools.TOOL_ADD_SHOPPING_LIST_ITEM, Map.of(
                 "listName", "Nope", "name", "Sugar"));
 
         ChatActionProposer.Outcome outcome = proposer.propose(USER_ID, session, call);
@@ -319,7 +319,7 @@ class ChatActionProposerTest {
         stubPersist(ChatActionType.GENERATE_SHOPPING_LIST_FROM_RECIPE);
 
         AiFunctionCall call = new AiFunctionCall(
-                GeminiProvider.TOOL_GENERATE_SHOPPING_LIST_FROM_RECIPE,
+                AiTools.TOOL_GENERATE_SHOPPING_LIST_FROM_RECIPE,
                 Map.of("recipeTitle", "Pizza"));
 
         ChatActionProposer.Outcome outcome = proposer.propose(USER_ID, session, call);

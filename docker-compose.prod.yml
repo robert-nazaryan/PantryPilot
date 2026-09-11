@@ -63,6 +63,8 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       AI_CHAT_ENABLED: ${AI_CHAT_ENABLED:-true}
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      AI_PROVIDER: ${AI_PROVIDER:-groq}
     depends_on:
       postgres:
         condition: service_healthy

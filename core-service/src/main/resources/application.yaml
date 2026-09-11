@@ -62,6 +62,7 @@ app:
     url: ${APP_FRONTEND_URL:http://localhost:5173}
 
 ai:
+  provider: ${AI_PROVIDER:groq}
   chat:
     enabled: ${AI_CHAT_ENABLED:true}
 
@@ -69,3 +70,8 @@ gemini:
   api-key: ${GEMINI_API_KEY:}
   model: ${GEMINI_MODEL:gemini-3.1-flash-lite}
   api-base-url: ${GEMINI_API_BASE_URL:https://generativelanguage.googleapis.com}
+
+groq:
+  api-key: ${GROQ_API_KEY:}
+  model: ${GROQ_MODEL:openai/gpt-oss-120b}
+  api-base-url: ${GROQ_API_BASE_URL:https://api.groq.com/openai/v1}
