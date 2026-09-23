@@ -17,6 +17,24 @@ async function runLifecycle(viewport) {
     console.log(`  [${viewport.name}] ${msg}`);
   }
 
+  async function openAddForm() {
+    await page.locator("main button", { hasText: "Add item" }).first().click();
+    if (isDesktop) {
+      await page.waitForSelector('[role="dialog"]', { timeout: 5000 });
+    } else {
+      await page.waitForURL("http://localhost:5173/pantry/new", { timeout: 5000 });
+    }
+    return isDesktop ? page.locator('[role="dialog"]') : page.locator("main");
+  }
+
+  async function waitForFormClosed() {
+    if (isDesktop) {
+      await page.waitForSelector('[role="dialog"]', { state: "detached", timeout: 8000 });
+    } else {
+      await page.waitForURL("http://localhost:5173/pantry", { timeout: 8000 });
+    }
+  }
+
   try {
     log("register + login");
     await page.goto("http://localhost:5173/register", { waitUntil: "networkidle" });
@@ -30,40 +48,52 @@ async function runLifecycle(viewport) {
     await page.goto("http://localhost:5173/pantry", { waitUntil: "networkidle" });
     await page.waitForSelector("text=Your pantry is empty");
 
-    log("open add form via list header button");
-    await page.locator("main button", { hasText: "Add item" }).first().click();
-    if (isDesktop) {
-      await page.waitForSelector('[role="dialog"]', { timeout: 5000 });
-    } else {
-      await page.waitForURL("http://localhost:5173/pantry/new", { timeout: 5000 });
-    }
-
-    const container = isDesktop ? page.locator('[role="dialog"]') : page.locator("main");
-    log("fill and submit create form (combobox for unit/category)");
+    log("open add form, fill merged quantity field with '2 L'");
+    let container = await openAddForm();
     await container.locator('input[placeholder="e.g. Whole milk"]').fill("Test milk");
-    await container.locator('input[type="number"]').fill("2");
-    const unitCombobox = container.locator('[data-testid="unit-combobox"]');
-    await unitCombobox.fill("L");
-    await unitCombobox.press("Tab");
+    const quantityInput = container.locator('[data-testid="quantity-input"]');
+    await quantityInput.fill("2 L");
+    const preview = container.locator('[data-testid="quantity-preview"]');
+    const previewText = await preview.textContent();
+    if (!previewText || !previewText.includes("→ 2 l")) {
+      throw new Error(`expected preview "→ 2 l", got "${previewText}"`);
+    }
     const categoryCombobox = container.locator('[data-testid="category-combobox"]');
     await categoryCombobox.fill("Dairy");
     await categoryCombobox.press("Tab");
     const in3 = new Date(); in3.setDate(in3.getDate() + 3);
     await container.locator('input[type="date"]').fill(in3.toISOString().slice(0, 10));
     await container.locator("button", { hasText: "Add item" }).click();
+    await waitForFormClosed();
 
-    if (isDesktop) {
-      await page.waitForSelector('[role="dialog"]', { state: "detached", timeout: 8000 });
-    } else {
-      await page.waitForURL("http://localhost:5173/pantry", { timeout: 8000 });
-    }
-    log("item appears in list");
+    log("item appears in list with parsed '2 l'");
     await page.waitForSelector('h3:has-text("Test milk")');
     const qtyText1 = await page.locator('li:has-text("Test milk")').locator("p").first().textContent();
-    if (!qtyText1.includes("2 L")) throw new Error(`expected "2 L", got "${qtyText1}"`);
+    if (!qtyText1.toLowerCase().includes("2 l")) {
+      throw new Error(`expected "2 l", got "${qtyText1}"`);
+    }
 
     log("expiry flag shows 'Expires in 3 days'");
     await page.waitForSelector('text=Expires in 3 days');
+
+    log("open add form again, fill number-only '5' to test pcs fallback");
+    container = await openAddForm();
+    await container.locator('input[placeholder="e.g. Whole milk"]').fill("Bread rolls");
+    await container.locator('[data-testid="quantity-input"]').fill("5");
+    const preview2 = container.locator('[data-testid="quantity-preview"]');
+    const previewText2 = await preview2.textContent();
+    if (!previewText2 || !previewText2.includes("→ 5 pcs") || !previewText2.includes("unit assumed")) {
+      throw new Error(`expected preview "→ 5 pcs (unit assumed)", got "${previewText2}"`);
+    }
+    await container.locator("button", { hasText: "Add item" }).click();
+    await waitForFormClosed();
+
+    log("number-only item saved with unit=pcs fallback");
+    await page.waitForSelector('h3:has-text("Bread rolls")');
+    const qtyText2 = await page.locator('li:has-text("Bread rolls")').locator("p").first().textContent();
+    if (!qtyText2.toLowerCase().includes("5 pcs")) {
+      throw new Error(`expected "5 pcs", got "${qtyText2}"`);
+    }
 
     log("open edit via pencil icon");
     await page.locator('li:has-text("Test milk") button[aria-label="Edit Test milk"]').click();
@@ -75,23 +105,32 @@ async function runLifecycle(viewport) {
     }
 
     const editContainer = isDesktop ? page.locator('[role="dialog"]') : page.locator("main");
+    log("edit changes both quantity and unit through the single field");
     await editContainer.locator('input[placeholder="e.g. Whole milk"]').fill("Renamed milk");
+    const editQty = editContainer.locator('[data-testid="quantity-input"]');
+    await editQty.fill("3 kg");
     await editContainer.locator("button", { hasText: "Save changes" }).click();
+    await waitForFormClosed();
 
-    if (isDesktop) {
-      await page.waitForSelector('[role="dialog"]', { state: "detached", timeout: 8000 });
-    } else {
-      await page.waitForURL("http://localhost:5173/pantry", { timeout: 8000 });
-    }
-    log("edit reflected in list");
+    log("edit reflected in list with new quantity + unit");
     await page.waitForSelector('h3:has-text("Renamed milk")');
+    const qtyText3 = await page.locator('li:has-text("Renamed milk")').locator("p").first().textContent();
+    if (!qtyText3.toLowerCase().includes("3 kg")) {
+      throw new Error(`expected "3 kg" after edit, got "${qtyText3}"`);
+    }
 
     log("delete with inline confirm");
     await page.locator('li:has-text("Renamed milk") button[aria-label="Delete Renamed milk"]').click();
     await page.waitForSelector('text=Delete this item?');
     await page.locator('li:has-text("Renamed milk") button:has-text("Delete")').click();
+    await page.waitForSelector('h3:has-text("Renamed milk")', { state: "detached", timeout: 5000 });
+
+    log("clean up Bread rolls too");
+    await page.locator('li:has-text("Bread rolls") button[aria-label="Delete Bread rolls"]').click();
+    await page.waitForSelector('text=Delete this item?');
+    await page.locator('li:has-text("Bread rolls") button:has-text("Delete")').click();
     await page.waitForSelector("text=Your pantry is empty");
-    log("empty state restored after delete");
+    log("empty state restored after final delete");
 
     log("PASSED");
     await browser.close();
