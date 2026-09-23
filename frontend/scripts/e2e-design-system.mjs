@@ -24,20 +24,18 @@ async function pantryFlow() {
   const page = await ctx.newPage();
   await register(page, "e2eds-pantry");
 
-  log("pantry", "create item via combobox suggestion");
+  log("pantry", "create item via canonical unit synonym in merged field");
   await page.goto("http://localhost:5173/pantry", { waitUntil: "networkidle" });
   await page.locator("main button", { hasText: "Add item" }).first().click();
   await page.waitForSelector('[role="dialog"]');
   const dialog = page.locator('[role="dialog"]');
   await dialog.locator('input[placeholder="e.g. Whole milk"]').fill("Whole milk");
-  await dialog.locator('input[type="number"]').fill("2");
-  const unitCombobox = dialog.locator('[data-testid="unit-combobox"]');
-  await unitCombobox.click();
-  // Suggestions should appear; pick "l" from seeded list by clicking
-  await page.waitForSelector('[role="option"]:has-text("l")');
-  await page.locator('[role="option"]', { hasText: /^l$/ }).first().click();
-  const unitValue = await unitCombobox.inputValue();
-  if (unitValue !== "l") throw new Error(`expected unit "l", got "${unitValue}"`);
+  // "2 liters" should canonicalize to "2 l" via the parser's synonym map
+  await dialog.locator('[data-testid="quantity-input"]').fill("2 liters");
+  const previewText = await dialog.locator('[data-testid="quantity-preview"]').textContent();
+  if (!previewText || !previewText.includes("→ 2 l")) {
+    throw new Error(`expected preview "→ 2 l", got "${previewText}"`);
+  }
   const categoryCombobox = dialog.locator('[data-testid="category-combobox"]');
   await categoryCombobox.click();
   await page.waitForSelector('[role="option"]:has-text("dairy")');
@@ -48,16 +46,14 @@ async function pantryFlow() {
   const line = await page.locator('[data-testid^="pantry-item-"]:has-text("Whole milk")').textContent();
   if (!line.includes("2 l")) throw new Error(`expected "2 l" in card, got "${line}"`);
   if (!line.toLowerCase().includes("dairy")) throw new Error(`expected "dairy" in card, got "${line}"`);
-  log("pantry", "PASS combobox suggestion path");
+  log("pantry", "PASS canonical-synonym path");
 
-  log("pantry", "create item with novel typed unit");
+  log("pantry", "create item with novel typed unit in merged field");
   await page.locator("main button", { hasText: "Add item" }).first().click();
   await page.waitForSelector('[role="dialog"]');
   await dialog.locator('input[placeholder="e.g. Whole milk"]').fill("Salt");
-  await dialog.locator('input[type="number"]').fill("1");
-  await unitCombobox.click();
-  await unitCombobox.fill("shakes"); // novel unit not in seed list
-  await unitCombobox.press("Escape");
+  // "1 shakes" — not a known unit, parser keeps it as-is
+  await dialog.locator('[data-testid="quantity-input"]').fill("1 shakes");
   await categoryCombobox.click();
   await categoryCombobox.fill("pantry"); // novel category
   await categoryCombobox.press("Escape");
@@ -67,7 +63,7 @@ async function pantryFlow() {
   const line2 = await page.locator('[data-testid^="pantry-item-"]:has-text("Salt")').textContent();
   if (!line2.includes("1 shakes")) throw new Error(`expected "1 shakes" in card, got "${line2}"`);
   if (!line2.toLowerCase().includes("pantry")) throw new Error(`expected "pantry" in card, got "${line2}"`);
-  log("pantry", "PASS novel-value path");
+  log("pantry", "PASS novel-unit path");
 
   await ctx.close();
 }

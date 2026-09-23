@@ -1,13 +1,12 @@
 import { useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { CalendarClock, Layers, Package, Scale, Tag } from "lucide-react";
+import { CalendarClock, Layers, Scale, Tag } from "lucide-react";
 import { Button } from "./Button";
 import { Combobox } from "./Combobox";
 import { TextField } from "./TextField";
-import {
-  useDistinctPantryCategories,
-  useDistinctPantryUnits,
-} from "../hooks/usePantryItems";
+import { useDistinctPantryCategories } from "../hooks/usePantryItems";
+import { formatInitialQuantityInput, parseQuantityInput } from "./quantityParse";
+import type { QuantityParseResult } from "./quantityParse";
 import type { PantryItemResponse } from "../types/pantry";
 
 export interface PantryItemFormValues {
@@ -30,7 +29,6 @@ interface PantryItemFormProps {
 interface FieldErrors {
   name?: string;
   quantity?: string;
-  unit?: string;
   category?: string;
   expiryDate?: string;
 }
@@ -39,7 +37,6 @@ const MAX_NAME = 200;
 const MAX_UNIT = 30;
 const MAX_CATEGORY = 50;
 
-const UNIT_SEEDS = ["pcs", "g", "kg", "ml", "l", "tsp", "tbsp", "cup", "oz", "lb"];
 const CATEGORY_SEEDS = [
   "dairy",
   "produce",
@@ -72,39 +69,47 @@ export function PantryItemForm({
   onCancel,
 }: PantryItemFormProps): ReactNode {
   const [name, setName] = useState(initial?.name ?? "");
-  const [quantity, setQuantity] = useState(
-    initial ? String(initial.quantity) : "",
+  const [quantityInput, setQuantityInput] = useState(
+    initial ? formatInitialQuantityInput(initial.quantity, initial.unit) : "",
   );
-  const [unit, setUnit] = useState(initial?.unit ?? "");
   const [category, setCategory] = useState(initial?.category ?? "");
   const [expiryDate, setExpiryDate] = useState(initial?.expiryDate ?? "");
   const [errors, setErrors] = useState<FieldErrors>({});
 
-  const unitsQuery = useDistinctPantryUnits();
   const categoriesQuery = useDistinctPantryCategories();
 
-  const unitOptions = useMemo(
-    () => mergeSuggestions(UNIT_SEEDS, unitsQuery.data ?? []),
-    [unitsQuery.data],
-  );
   const categoryOptions = useMemo(
     () => mergeSuggestions(CATEGORY_SEEDS, categoriesQuery.data ?? []),
     [categoriesQuery.data],
   );
+
+  const parsed = useMemo<QuantityParseResult>(
+    () => parseQuantityInput(quantityInput),
+    [quantityInput],
+  );
+
+  function quantityError(): string | undefined {
+    if (parsed.kind === "empty") return "Quantity is required.";
+    if (parsed.kind === "unparseable") {
+      return "Enter a quantity like \"2 kg\" or \"3\".";
+    }
+    if (parsed.unit.length > MAX_UNIT) {
+      return `Unit must be at most ${MAX_UNIT} characters.`;
+    }
+    if (mode === "create" && parsed.quantity <= 0) {
+      return "Quantity must be greater than 0.";
+    }
+    if (parsed.quantity < 0) return "Quantity cannot be negative.";
+    return undefined;
+  }
 
   function validate(): FieldErrors {
     const next: FieldErrors = {};
     if (!name.trim()) next.name = "Name is required.";
     else if (name.length > MAX_NAME) next.name = `Name must be at most ${MAX_NAME} characters.`;
 
-    const qty = Number(quantity);
-    if (!quantity.trim()) next.quantity = "Quantity is required.";
-    else if (Number.isNaN(qty)) next.quantity = "Enter a valid number.";
-    else if (mode === "create" && qty <= 0) next.quantity = "Quantity must be greater than 0.";
-    else if (qty < 0) next.quantity = "Quantity cannot be negative.";
-
-    if (!unit.trim()) next.unit = "Unit is required.";
-    else if (unit.length > MAX_UNIT) next.unit = `Unit must be at most ${MAX_UNIT} characters.`;
+    const qErr = quantityError();
+    if (qErr) next.quantity = qErr;
 
     if (category.length > MAX_CATEGORY) {
       next.category = `Category must be at most ${MAX_CATEGORY} characters.`;
@@ -127,14 +132,18 @@ export function PantryItemForm({
     const next = validate();
     setErrors(next);
     if (Object.keys(next).length > 0) return;
+    if (parsed.kind !== "parsed") return;
     await onSubmit({
       name: name.trim(),
-      quantity: Number(quantity),
-      unit: unit.trim(),
+      quantity: parsed.quantity,
+      unit: parsed.unit,
       category: category.trim() ? category.trim() : null,
       expiryDate: expiryDate ? expiryDate : null,
     });
   }
+
+  const previewText = quantityPreviewText(parsed);
+  const previewIsWarning = parsed.kind === "unparseable";
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
@@ -147,31 +156,32 @@ export function PantryItemForm({
         placeholder="e.g. Whole milk"
         required
       />
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="flex flex-col gap-1">
         <TextField
           label="Quantity"
           icon={Scale}
-          type="number"
-          inputMode="decimal"
-          step="0.001"
-          min="0"
-          value={quantity}
-          onChange={(e) => setQuantity(e.target.value)}
+          value={quantityInput}
+          onChange={(e) => setQuantityInput(e.target.value)}
           error={errors.quantity}
+          placeholder='e.g. 2 kg, 500 ml, 3'
+          inputMode="decimal"
+          autoComplete="off"
           required
+          data-testid="quantity-input"
         />
-        <Combobox
-          label="Unit"
-          icon={Package}
-          value={unit}
-          onChange={setUnit}
-          options={unitOptions}
-          placeholder="e.g. L, kg, cans"
-          error={errors.unit}
-          required
-          maxLength={MAX_UNIT}
-          data-testid="unit-combobox"
-        />
+        {!errors.quantity && previewText ? (
+          <p
+            data-testid="quantity-preview"
+            className={
+              "text-body-sm " +
+              (previewIsWarning
+                ? "text-warning"
+                : "text-text-secondary dark:text-text-secondary-dark")
+            }
+          >
+            {previewText}
+          </p>
+        ) : null}
       </div>
       <Combobox
         label="Category"
@@ -214,4 +224,13 @@ export function PantryItemForm({
       </div>
     </form>
   );
+}
+
+function quantityPreviewText(parsed: QuantityParseResult): string | null {
+  if (parsed.kind === "empty") return null;
+  if (parsed.kind === "unparseable") {
+    return 'Add a number too, e.g. "2 kg" or "3".';
+  }
+  const base = `→ ${parsed.quantity} ${parsed.unit}`;
+  return parsed.unitAssumed ? `${base} (unit assumed)` : base;
 }
