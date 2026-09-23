@@ -32,39 +32,50 @@ public class UserContextSnapshotBuilder {
     @Transactional(readOnly = true)
     public String buildFor(Long userId) {
         StringBuilder sb = new StringBuilder(2048);
-        sb.append("You are PantryPilot's in-app cooking and pantry assistant. ")
-                .append("Answer questions using the user's real data below. ")
-                .append("Be concise, practical, and only suggest recipes the user could plausibly make ")
-                .append("from their pantry (or note what's missing). ")
-                .append("Do not invent items the user does not own.\n\n")
-                .append("HOW TO USE TOOLS:\n")
-                .append("- Prefer calling a tool over describing the change in text when the user asks to modify their data.\n")
-                .append("- When identifying an existing item/list/recipe, refer to it by the EXACT name shown below.\n")
-                .append("- When the user's request affects MULTIPLE targets ('all', 'every', 'both', 'empty', 'clear'), ")
-                .append("ALWAYS use a bulk_* tool (e.g. bulk_delete_pantry_items) — never propose individual actions ")
-                .append("one-at-a-time or ask which one when the user clearly meant all/both of them.\n")
-                .append("- When your PREVIOUS turn asked a clarifying question and the current user message ")
-                .append("answers it (e.g. 'both', 'all of them', 'the 1 liter one'), treat it as continuing the ")
-                .append("prior request: emit the appropriate tool call NOW, do not restart the conversation.\n")
-                .append("- Distinguish domains carefully: 'add X to shopping list' means add_shopping_list_item, ")
-                .append("NOT create_pantry_item. 'Add X to pantry' means create_pantry_item.\n\n");
-
+        appendSystemPrompt(sb);
         appendPantry(sb, userId);
         appendRecipes(sb, userId);
         appendShoppingLists(sb, userId);
         return sb.toString();
     }
 
+    private static void appendSystemPrompt(StringBuilder sb) {
+        sb.append("You are PantryPilot's in-app cooking and pantry assistant. ")
+                .append("Answer using the user's real data below. Be concise and practical. ")
+                .append("Only suggest recipes the user could plausibly make from their pantry, or note ")
+                .append("what's missing. Do not invent items the user does not own.\n\n")
+                .append("DOMAIN DISAMBIGUATION — this is the #1 rule you must follow:\n")
+                .append("- PANTRY = things the user physically has on hand right now.\n")
+                .append("- SHOPPING LIST = things the user still needs to buy.\n")
+                .append("- RECIPE = a saved cooking method (title + instructions + ingredients).\n")
+                .append("The user's verbs are ambiguous. Resolve them like this:\n")
+                .append("  * \"add X\" alone → ASK which domain, unless the message clearly says pantry/list/recipe.\n")
+                .append("  * \"add X to my pantry\" / \"I bought X\" / \"I have X\" → create_pantry_item.\n")
+                .append("  * \"add X to shopping list\" / \"I need to buy X\" / \"put X on the list\" → add_shopping_list_item.\n")
+                .append("  * \"add X to <recipe name>\" → add_recipe_ingredient.\n")
+                .append("  * \"add ingredients for <recipe> to my shopping list\" → generate_shopping_list_from_recipe.\n\n")
+                .append("HOW TO USE TOOLS:\n")
+                .append("- Prefer calling a tool over describing the change in text when the user asks to modify data.\n")
+                .append("- When identifying an existing thing, use the EXACT name shown below and the [pantry:N] / ")
+                .append("[list:N] / [list-item:N] / [recipe:N] / [ingredient:N] id if available.\n")
+                .append("- When the request affects MULTIPLE targets (\"all\", \"every\", \"both\", \"empty\", \"clear\"), ")
+                .append("ALWAYS use a bulk_* tool — never loop individual actions and never ask which one when the ")
+                .append("user clearly meant all/both.\n")
+                .append("- When your PREVIOUS turn asked a clarifying question and the current user message answers ")
+                .append("it (\"both\", \"all of them\", \"the 1 liter one\"), continue the prior request: emit the ")
+                .append("appropriate tool call NOW, do not restart the conversation.\n\n");
+    }
+
     private void appendPantry(StringBuilder sb, Long userId) {
-        sb.append("## Pantry\n");
+        sb.append("## Pantry (what the user HAS on hand)\n");
         var page = pantryItemRepository.findByUserIdOrderByExpiryDateAscNullsLast(
                 userId, PageRequest.of(0, MAX_PANTRY_ITEMS));
         List<PantryItem> items = page.getContent();
         if (items.isEmpty()) {
-            sb.append("(empty)\n");
+            sb.append("(empty — the user currently owns no pantry items)\n");
         } else {
             for (PantryItem item : items) {
-                sb.append("- [id=").append(item.getId()).append("] ").append(item.getName())
+                sb.append("- [pantry:").append(item.getId()).append("] ").append(item.getName())
                         .append(" — ").append(item.getQuantity()).append(' ').append(item.getUnit());
                 if (item.getExpiryDate() != null) {
                     sb.append(" (expires ").append(item.getExpiryDate()).append(')');
@@ -84,10 +95,10 @@ public class UserContextSnapshotBuilder {
         var page = recipeRepository.findByUserId(userId, PageRequest.of(0, MAX_RECIPES));
         List<Recipe> recipes = page.getContent();
         if (recipes.isEmpty()) {
-            sb.append("(none)\n");
+            sb.append("(none — the user has no saved recipes)\n");
         } else {
             for (Recipe r : recipes) {
-                sb.append("- [id=").append(r.getId()).append("] ").append(r.getTitle());
+                sb.append("- [recipe:").append(r.getId()).append("] ").append(r.getTitle());
                 if (r.getCookTimeMinutes() != null) {
                     sb.append(" (").append(r.getCookTimeMinutes()).append(" min)");
                 }
@@ -118,7 +129,7 @@ public class UserContextSnapshotBuilder {
                 sb.append("    (+ ").append(ings.size() - shown).append(" more ingredients)\n");
                 break;
             }
-            sb.append("    * [id=").append(ing.getId()).append("] ").append(ing.getName());
+            sb.append("    * [ingredient:").append(ing.getId()).append("] ").append(ing.getName());
             if (ing.getQuantity() != null) {
                 sb.append(" — ").append(ing.getQuantity());
                 if (ing.getUnit() != null) {
@@ -131,17 +142,17 @@ public class UserContextSnapshotBuilder {
     }
 
     private void appendShoppingLists(StringBuilder sb, Long userId) {
-        sb.append("## Shopping lists\n");
+        sb.append("## Shopping lists (what the user still NEEDS TO BUY)\n");
         var page = shoppingListRepository.findByUserId(
                 userId, PageRequest.of(0, MAX_ACTIVE_SHOPPING_LISTS));
         List<ShoppingList> lists = page.getContent();
         if (lists.isEmpty()) {
-            sb.append("(no lists)\n");
+            sb.append("(no lists — the user has no shopping lists yet)\n");
             return;
         }
         for (ShoppingList list : lists) {
             String name = list.getName() != null ? list.getName() : "(unnamed)";
-            sb.append("- [id=").append(list.getId()).append("] ").append(name);
+            sb.append("- [list:").append(list.getId()).append("] ").append(name);
             if (list.isActive()) {
                 sb.append(" (active)");
             }
@@ -164,7 +175,7 @@ public class UserContextSnapshotBuilder {
                 break;
             }
             sb.append("    ").append(item.isChecked() ? "[x] " : "[ ] ")
-                    .append("[id=").append(item.getId()).append("] ").append(item.getName());
+                    .append("[list-item:").append(item.getId()).append("] ").append(item.getName());
             if (item.getQuantity() != null) {
                 sb.append(" — ").append(item.getQuantity());
                 if (item.getUnit() != null) {

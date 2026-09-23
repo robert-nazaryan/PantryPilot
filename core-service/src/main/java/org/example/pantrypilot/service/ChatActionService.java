@@ -28,13 +28,20 @@ import org.example.pantrypilot.dto.CreateShoppingListItemRequest;
 import org.example.pantrypilot.dto.CreateShoppingListRequest;
 import org.example.pantrypilot.dto.DeletePantryItemActionPayload;
 import org.example.pantrypilot.dto.DeleteRecipeActionPayload;
+import org.example.pantrypilot.dto.DeleteShoppingListActionPayload;
 import org.example.pantrypilot.dto.GenerateShoppingListFromRecipeActionPayload;
+import org.example.pantrypilot.dto.RecipeResponse;
 import org.example.pantrypilot.dto.RemoveRecipeIngredientActionPayload;
 import org.example.pantrypilot.dto.RemoveShoppingListItemActionPayload;
+import org.example.pantrypilot.dto.RenameShoppingListActionPayload;
 import org.example.pantrypilot.dto.SetShoppingListItemCheckedActionPayload;
+import org.example.pantrypilot.dto.ShoppingListResponse;
 import org.example.pantrypilot.dto.ToggleShoppingListItemCheckedRequest;
 import org.example.pantrypilot.dto.UpdatePantryItemActionPayload;
 import org.example.pantrypilot.dto.UpdatePantryItemRequest;
+import org.example.pantrypilot.dto.UpdateRecipeActionPayload;
+import org.example.pantrypilot.dto.UpdateRecipeRequest;
+import org.example.pantrypilot.dto.UpdateShoppingListRequest;
 import org.example.pantrypilot.model.ChatAction;
 import org.example.pantrypilot.model.ChatActionStatus;
 import org.example.pantrypilot.model.ChatActionType;
@@ -97,6 +104,12 @@ public class ChatActionService {
                     executeConsumePantryItem(userId, action.getPayloadJson()));
             case CREATE_SHOPPING_LIST -> ConfirmActionResponse.single(action.getType(),
                     executeCreateShoppingList(userId, action.getPayloadJson()));
+            case RENAME_SHOPPING_LIST -> ConfirmActionResponse.single(action.getType(),
+                    executeRenameShoppingList(userId, action.getPayloadJson()));
+            case DELETE_SHOPPING_LIST -> {
+                executeDeleteShoppingList(userId, action.getPayloadJson());
+                yield ConfirmActionResponse.single(action.getType(), null);
+            }
             case ADD_SHOPPING_LIST_ITEM -> ConfirmActionResponse.single(action.getType(),
                     executeAddShoppingListItem(userId, action.getPayloadJson()));
             case REMOVE_SHOPPING_LIST_ITEM -> {
@@ -110,6 +123,8 @@ public class ChatActionService {
                     executeGenerateShoppingListFromRecipe(userId, action.getPayloadJson()));
             case CREATE_RECIPE -> ConfirmActionResponse.single(action.getType(),
                     executeCreateRecipe(userId, action.getPayloadJson()));
+            case UPDATE_RECIPE -> ConfirmActionResponse.single(action.getType(),
+                    executeUpdateRecipe(userId, action.getPayloadJson()));
             case DELETE_RECIPE -> {
                 executeDeleteRecipe(userId, action.getPayloadJson());
                 yield ConfirmActionResponse.single(action.getType(), null);
@@ -159,6 +174,19 @@ public class ChatActionService {
         return shoppingListService.createList(userId, new CreateShoppingListRequest(p.name()));
     }
 
+    private Object executeRenameShoppingList(Long userId, String json) {
+        RenameShoppingListActionPayload p = deserialize(json, RenameShoppingListActionPayload.class);
+        ShoppingListResponse current = shoppingListService.getList(userId, p.listId());
+        UpdateShoppingListRequest req = new UpdateShoppingListRequest(p.newName(), current.active());
+        validate(req);
+        return shoppingListService.updateList(userId, p.listId(), req);
+    }
+
+    private void executeDeleteShoppingList(Long userId, String json) {
+        DeleteShoppingListActionPayload p = deserialize(json, DeleteShoppingListActionPayload.class);
+        shoppingListService.deleteList(userId, p.listId());
+    }
+
     private Object executeAddShoppingListItem(Long userId, String json) {
         AddShoppingListItemActionPayload p = deserialize(json, AddShoppingListItemActionPayload.class);
         CreateShoppingListItemRequest req = new CreateShoppingListItemRequest(
@@ -185,6 +213,24 @@ public class ChatActionService {
     }
 
     // ---------- Recipes ----------
+
+    private Object executeUpdateRecipe(Long userId, String json) {
+        UpdateRecipeActionPayload p = deserialize(json, UpdateRecipeActionPayload.class);
+        RecipeResponse current = recipeService.getRecipe(userId, p.recipeId());
+        String title = p.newTitle() != null && !p.newTitle().isBlank() ? p.newTitle() : current.title();
+        String instructions = p.instructions() != null && !p.instructions().isBlank()
+                ? p.instructions() : current.instructions();
+        Integer cookTime = p.cookTimeMinutes() != null ? p.cookTimeMinutes() : current.cookTimeMinutes();
+        String[] tags;
+        if (p.tags() != null) {
+            tags = p.tags().toArray(new String[0]);
+        } else {
+            tags = current.tags() == null ? new String[0] : current.tags();
+        }
+        UpdateRecipeRequest req = new UpdateRecipeRequest(title, instructions, cookTime, tags);
+        validate(req);
+        return recipeService.updateRecipe(userId, p.recipeId(), req);
+    }
 
     private Object executeCreateRecipe(Long userId, String json) {
         CreateRecipeActionPayload p = deserialize(json, CreateRecipeActionPayload.class);

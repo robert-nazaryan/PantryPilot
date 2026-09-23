@@ -17,12 +17,15 @@ import org.example.pantrypilot.dto.CreateRecipeActionPayload;
 import org.example.pantrypilot.dto.CreateShoppingListActionPayload;
 import org.example.pantrypilot.dto.DeletePantryItemActionPayload;
 import org.example.pantrypilot.dto.DeleteRecipeActionPayload;
+import org.example.pantrypilot.dto.DeleteShoppingListActionPayload;
 import org.example.pantrypilot.dto.GenerateShoppingListFromRecipeActionPayload;
 import org.example.pantrypilot.dto.ProposedActionResponse;
 import org.example.pantrypilot.dto.RemoveRecipeIngredientActionPayload;
 import org.example.pantrypilot.dto.RemoveShoppingListItemActionPayload;
+import org.example.pantrypilot.dto.RenameShoppingListActionPayload;
 import org.example.pantrypilot.dto.SetShoppingListItemCheckedActionPayload;
 import org.example.pantrypilot.dto.UpdatePantryItemActionPayload;
+import org.example.pantrypilot.dto.UpdateRecipeActionPayload;
 import org.example.pantrypilot.model.ChatAction;
 import org.example.pantrypilot.model.ChatActionType;
 import org.example.pantrypilot.model.ChatSession;
@@ -83,12 +86,15 @@ public class ChatActionProposer {
             case AiTools.TOOL_CONSUME_PANTRY_ITEM -> proposeConsumePantryItem(userId, session, call);
             case AiTools.TOOL_BULK_DELETE_PANTRY_ITEMS -> proposeBulkDeletePantryItems(userId, session, call);
             case AiTools.TOOL_CREATE_SHOPPING_LIST -> proposeCreateShoppingList(session, call);
+            case AiTools.TOOL_RENAME_SHOPPING_LIST -> proposeRenameShoppingList(userId, session, call);
+            case AiTools.TOOL_DELETE_SHOPPING_LIST -> proposeDeleteShoppingList(userId, session, call);
             case AiTools.TOOL_ADD_SHOPPING_LIST_ITEM -> proposeAddShoppingListItem(userId, session, call);
             case AiTools.TOOL_REMOVE_SHOPPING_LIST_ITEM -> proposeRemoveShoppingListItem(userId, session, call);
             case AiTools.TOOL_CHECK_SHOPPING_LIST_ITEM -> proposeSetShoppingListItemChecked(userId, session, call, true);
             case AiTools.TOOL_UNCHECK_SHOPPING_LIST_ITEM -> proposeSetShoppingListItemChecked(userId, session, call, false);
             case AiTools.TOOL_GENERATE_SHOPPING_LIST_FROM_RECIPE -> proposeGenerateShoppingListFromRecipe(userId, session, call);
             case AiTools.TOOL_CREATE_RECIPE -> proposeCreateRecipe(session, call);
+            case AiTools.TOOL_UPDATE_RECIPE -> proposeUpdateRecipe(userId, session, call);
             case AiTools.TOOL_DELETE_RECIPE -> proposeDeleteRecipe(userId, session, call);
             case AiTools.TOOL_ADD_RECIPE_INGREDIENT -> proposeAddRecipeIngredient(userId, session, call);
             case AiTools.TOOL_REMOVE_RECIPE_INGREDIENT -> proposeRemoveRecipeIngredient(userId, session, call);
@@ -194,6 +200,31 @@ public class ChatActionProposer {
                 new CreateShoppingListActionPayload(name));
     }
 
+    private Outcome proposeRenameShoppingList(Long userId, ChatSession session, AiFunctionCall call) {
+        ShoppingList list = resolveShoppingListFromCall(userId, call);
+        if (list == null) {
+            return listClarification(call, "rename");
+        }
+        String newName = stringArg(call, "newName");
+        if (newName == null || newName.isBlank()) {
+            return Outcome.clarify("What should I rename \"" + list.getName() + "\" to?");
+        }
+        return persist(session, ChatActionType.RENAME_SHOPPING_LIST,
+                new RenameShoppingListActionPayload(list.getId(), list.getName(), newName.trim()));
+    }
+
+    private Outcome proposeDeleteShoppingList(Long userId, ChatSession session, AiFunctionCall call) {
+        ShoppingList list = resolveShoppingListFromCall(userId, call);
+        if (list == null) {
+            return listClarification(call, "delete");
+        }
+        ShoppingList loaded = shoppingListRepository.findByIdAndUserIdWithItems(
+                list.getId(), userId).orElse(list);
+        int itemCount = loaded.getItems() == null ? 0 : loaded.getItems().size();
+        return persist(session, ChatActionType.DELETE_SHOPPING_LIST,
+                new DeleteShoppingListActionPayload(list.getId(), list.getName(), itemCount));
+    }
+
     private Outcome proposeAddShoppingListItem(Long userId, ChatSession session, AiFunctionCall call) {
         ShoppingList list = resolveShoppingListFromCall(userId, call);
         if (list == null) {
@@ -268,6 +299,30 @@ public class ChatActionProposer {
                 : List.of();
         return persist(session, ChatActionType.CREATE_RECIPE,
                 new CreateRecipeActionPayload(title, instructions, intArg(call, "cookTimeMinutes"), tags));
+    }
+
+    private Outcome proposeUpdateRecipe(Long userId, ChatSession session, AiFunctionCall call) {
+        Recipe recipe = resolveRecipeFromCall(userId, call);
+        if (recipe == null) {
+            return Outcome.clarify("Which recipe did you want to update?");
+        }
+        String newTitle = nullableStringArg(call, "newTitle", null);
+        String instructions = nullableStringArg(call, "instructions", null);
+        Integer cookTime = intArg(call, "cookTimeMinutes");
+        Object rawTags = call.args().get("tags");
+        List<String> tags;
+        if (rawTags instanceof List<?> rawList) {
+            tags = rawList.stream().map(String::valueOf).toList();
+        } else {
+            tags = null;
+        }
+        if (newTitle == null && instructions == null && cookTime == null && tags == null) {
+            return Outcome.clarify("What should I change on \"" + recipe.getTitle() + "\"?");
+        }
+        return persist(session, ChatActionType.UPDATE_RECIPE,
+                new UpdateRecipeActionPayload(
+                        recipe.getId(), recipe.getTitle(), newTitle,
+                        instructions, cookTime, tags));
     }
 
     private Outcome proposeDeleteRecipe(Long userId, ChatSession session, AiFunctionCall call) {
