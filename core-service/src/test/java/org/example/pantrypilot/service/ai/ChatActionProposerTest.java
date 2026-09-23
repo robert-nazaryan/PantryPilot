@@ -11,9 +11,14 @@ import org.example.pantrypilot.dto.BulkActionPayload;
 import org.example.pantrypilot.dto.ConsumePantryItemActionPayload;
 import org.example.pantrypilot.dto.CreateShoppingListActionPayload;
 import org.example.pantrypilot.dto.DeletePantryItemActionPayload;
+import org.example.pantrypilot.dto.DeleteShoppingListActionPayload;
 import org.example.pantrypilot.dto.GenerateShoppingListFromRecipeActionPayload;
 import org.example.pantrypilot.dto.ProposedActionResponse;
+import org.example.pantrypilot.dto.RenameShoppingListActionPayload;
 import org.example.pantrypilot.dto.UpdatePantryItemActionPayload;
+import org.example.pantrypilot.dto.UpdateRecipeActionPayload;
+import java.util.Optional;
+import org.example.pantrypilot.model.ShoppingListItem;
 import org.example.pantrypilot.model.ChatAction;
 import org.example.pantrypilot.model.ChatActionStatus;
 import org.example.pantrypilot.model.ChatActionType;
@@ -328,6 +333,150 @@ class ChatActionProposerTest {
                 (GenerateShoppingListFromRecipeActionPayload) outcome.proposedAction().payload();
         assertThat(p.recipeId()).isEqualTo(9L);
         assertThat(p.recipeTitle()).isEqualTo("Pizza");
+    }
+
+    @Test
+    void propose_renameShoppingList_resolvesListAndCarriesNewName() {
+        ShoppingList list = ShoppingList.builder().id(7L).name("Groceries")
+                .user(User.builder().id(USER_ID).build()).build();
+        when(shoppingListRepository.findByUserIdAndNameIgnoreCase(USER_ID, "Groceries"))
+                .thenReturn(List.of(list));
+        stubPersist(ChatActionType.RENAME_SHOPPING_LIST);
+
+        AiFunctionCall call = new AiFunctionCall(AiTools.TOOL_RENAME_SHOPPING_LIST, Map.of(
+                "listName", "Groceries", "newName", "Weekly shop"));
+
+        ChatActionProposer.Outcome outcome = proposer.propose(USER_ID, session, call);
+
+        RenameShoppingListActionPayload p =
+                (RenameShoppingListActionPayload) outcome.proposedAction().payload();
+        assertThat(p.listId()).isEqualTo(7L);
+        assertThat(p.currentName()).isEqualTo("Groceries");
+        assertThat(p.newName()).isEqualTo("Weekly shop");
+    }
+
+    @Test
+    void propose_renameShoppingList_missingNewName_returnsClarification() {
+        ShoppingList list = ShoppingList.builder().id(7L).name("Groceries")
+                .user(User.builder().id(USER_ID).build()).build();
+        when(shoppingListRepository.findByUserIdAndNameIgnoreCase(USER_ID, "Groceries"))
+                .thenReturn(List.of(list));
+
+        AiFunctionCall call = new AiFunctionCall(AiTools.TOOL_RENAME_SHOPPING_LIST,
+                Map.of("listName", "Groceries"));
+
+        ChatActionProposer.Outcome outcome = proposer.propose(USER_ID, session, call);
+
+        assertThat(outcome.proposedAction()).isNull();
+        assertThat(outcome.clarificationText()).contains("rename").contains("Groceries");
+    }
+
+    @Test
+    void propose_renameShoppingList_unknownList_returnsClarification() {
+        when(shoppingListRepository.findByUserIdAndNameIgnoreCase(USER_ID, "Ghost"))
+                .thenReturn(List.of());
+
+        AiFunctionCall call = new AiFunctionCall(AiTools.TOOL_RENAME_SHOPPING_LIST,
+                Map.of("listName", "Ghost", "newName", "New"));
+
+        ChatActionProposer.Outcome outcome = proposer.propose(USER_ID, session, call);
+
+        assertThat(outcome.proposedAction()).isNull();
+        assertThat(outcome.clarificationText()).contains("Ghost");
+    }
+
+    @Test
+    void propose_deleteShoppingList_capturesItemCountForConfirmation() {
+        User owner = User.builder().id(USER_ID).build();
+        ShoppingList list = ShoppingList.builder().id(11L).name("Old list").user(owner).build();
+        ShoppingList loaded = ShoppingList.builder().id(11L).name("Old list").user(owner).build();
+        loaded.getItems().add(ShoppingListItem.builder().id(1L).name("Sugar").shoppingList(loaded).build());
+        loaded.getItems().add(ShoppingListItem.builder().id(2L).name("Salt").shoppingList(loaded).build());
+        when(shoppingListRepository.findByUserIdAndNameIgnoreCase(USER_ID, "Old list"))
+                .thenReturn(List.of(list));
+        when(shoppingListRepository.findByIdAndUserIdWithItems(11L, USER_ID))
+                .thenReturn(Optional.of(loaded));
+        stubPersist(ChatActionType.DELETE_SHOPPING_LIST);
+
+        AiFunctionCall call = new AiFunctionCall(AiTools.TOOL_DELETE_SHOPPING_LIST,
+                Map.of("listName", "Old list"));
+
+        ChatActionProposer.Outcome outcome = proposer.propose(USER_ID, session, call);
+
+        DeleteShoppingListActionPayload p =
+                (DeleteShoppingListActionPayload) outcome.proposedAction().payload();
+        assertThat(p.listId()).isEqualTo(11L);
+        assertThat(p.listName()).isEqualTo("Old list");
+        assertThat(p.itemCount()).isEqualTo(2);
+    }
+
+    @Test
+    void propose_deleteShoppingList_unknownList_returnsClarification() {
+        when(shoppingListRepository.findByUserIdAndNameIgnoreCase(USER_ID, "Ghost"))
+                .thenReturn(List.of());
+
+        AiFunctionCall call = new AiFunctionCall(AiTools.TOOL_DELETE_SHOPPING_LIST,
+                Map.of("listName", "Ghost"));
+
+        ChatActionProposer.Outcome outcome = proposer.propose(USER_ID, session, call);
+
+        assertThat(outcome.proposedAction()).isNull();
+        assertThat(outcome.clarificationText()).contains("Ghost");
+    }
+
+    @Test
+    void propose_updateRecipe_resolvesRecipeAndCarriesOnlyProvidedFields() {
+        Recipe recipe = Recipe.builder().id(9L).title("Pizza")
+                .user(User.builder().id(USER_ID).build()).build();
+        when(recipeRepository.findByUserIdAndTitleIgnoreCase(USER_ID, "Pizza"))
+                .thenReturn(List.of(recipe));
+        stubPersist(ChatActionType.UPDATE_RECIPE);
+
+        AiFunctionCall call = new AiFunctionCall(AiTools.TOOL_UPDATE_RECIPE, Map.of(
+                "recipeTitle", "Pizza",
+                "cookTimeMinutes", 25,
+                "tags", List.of("italian", "quick")));
+
+        ChatActionProposer.Outcome outcome = proposer.propose(USER_ID, session, call);
+
+        UpdateRecipeActionPayload p =
+                (UpdateRecipeActionPayload) outcome.proposedAction().payload();
+        assertThat(p.recipeId()).isEqualTo(9L);
+        assertThat(p.currentTitle()).isEqualTo("Pizza");
+        assertThat(p.newTitle()).isNull();
+        assertThat(p.instructions()).isNull();
+        assertThat(p.cookTimeMinutes()).isEqualTo(25);
+        assertThat(p.tags()).containsExactly("italian", "quick");
+    }
+
+    @Test
+    void propose_updateRecipe_noFieldsToChange_returnsClarification() {
+        Recipe recipe = Recipe.builder().id(9L).title("Pizza")
+                .user(User.builder().id(USER_ID).build()).build();
+        when(recipeRepository.findByUserIdAndTitleIgnoreCase(USER_ID, "Pizza"))
+                .thenReturn(List.of(recipe));
+
+        AiFunctionCall call = new AiFunctionCall(AiTools.TOOL_UPDATE_RECIPE,
+                Map.of("recipeTitle", "Pizza"));
+
+        ChatActionProposer.Outcome outcome = proposer.propose(USER_ID, session, call);
+
+        assertThat(outcome.proposedAction()).isNull();
+        assertThat(outcome.clarificationText()).contains("change").contains("Pizza");
+    }
+
+    @Test
+    void propose_updateRecipe_unknownRecipe_returnsClarification() {
+        when(recipeRepository.findByUserIdAndTitleIgnoreCase(USER_ID, "Ghost"))
+                .thenReturn(List.of());
+
+        AiFunctionCall call = new AiFunctionCall(AiTools.TOOL_UPDATE_RECIPE,
+                Map.of("recipeTitle", "Ghost", "newTitle", "X"));
+
+        ChatActionProposer.Outcome outcome = proposer.propose(USER_ID, session, call);
+
+        assertThat(outcome.proposedAction()).isNull();
+        assertThat(outcome.clarificationText()).contains("update");
     }
 
     private void stubPersist(ChatActionType type) {

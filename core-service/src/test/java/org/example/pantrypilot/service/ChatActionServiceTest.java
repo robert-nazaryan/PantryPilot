@@ -14,9 +14,17 @@ import org.example.pantrypilot.dto.ConsumePantryItemActionPayload;
 import org.example.pantrypilot.dto.ConsumeQuantityRequest;
 import org.example.pantrypilot.dto.CreatePantryItemRequest;
 import org.example.pantrypilot.dto.DeletePantryItemActionPayload;
+import org.example.pantrypilot.dto.DeleteShoppingListActionPayload;
 import org.example.pantrypilot.dto.PantryItemResponse;
+import org.example.pantrypilot.dto.RecipeIngredientResponse;
+import org.example.pantrypilot.dto.RecipeResponse;
+import org.example.pantrypilot.dto.RenameShoppingListActionPayload;
+import org.example.pantrypilot.dto.ShoppingListResponse;
 import org.example.pantrypilot.dto.UpdatePantryItemActionPayload;
 import org.example.pantrypilot.dto.UpdatePantryItemRequest;
+import org.example.pantrypilot.dto.UpdateRecipeActionPayload;
+import org.example.pantrypilot.dto.UpdateRecipeRequest;
+import org.example.pantrypilot.dto.UpdateShoppingListRequest;
 import org.example.pantrypilot.model.ChatAction;
 import org.example.pantrypilot.model.ChatActionStatus;
 import org.example.pantrypilot.model.ChatActionType;
@@ -325,5 +333,131 @@ class ChatActionServiceTest {
         verify(pantryItemService).deleteItem(USER_ID, 202L);
         verify(pantryItemService).deleteItem(USER_ID, 203L);
         assertThat(action.getStatus()).isEqualTo(ChatActionStatus.CONFIRMED);
+    }
+
+    @Test
+    void confirm_renameShoppingList_readsCurrentActiveAndDispatchesUpdate() throws Exception {
+        Long listId = 44L;
+        RenameShoppingListActionPayload payload = new RenameShoppingListActionPayload(
+                listId, "Groceries", "Weekly shop");
+        ChatAction action = ChatAction.builder()
+                .id(ACTION_ID)
+                .session(ChatSession.builder().user(User.builder().id(USER_ID).build()).build())
+                .type(ChatActionType.RENAME_SHOPPING_LIST)
+                .status(ChatActionStatus.PENDING)
+                .payloadJson(objectMapper.writeValueAsString(payload))
+                .build();
+        when(actionRepository.findByIdAndUserId(ACTION_ID, USER_ID)).thenReturn(Optional.of(action));
+        ShoppingListResponse before = new ShoppingListResponse(
+                listId, "Groceries", true,
+                OffsetDateTime.now(), OffsetDateTime.now(), java.util.List.of());
+        ShoppingListResponse after = new ShoppingListResponse(
+                listId, "Weekly shop", true,
+                before.createdAt(), OffsetDateTime.now(), java.util.List.of());
+        when(shoppingListService.getList(USER_ID, listId)).thenReturn(before);
+        when(shoppingListService.updateList(eq(USER_ID), eq(listId), any(UpdateShoppingListRequest.class)))
+                .thenReturn(after);
+
+        ConfirmActionResponse actual = service.confirm(USER_ID, ACTION_ID);
+
+        assertThat(actual.actionType()).isEqualTo(ChatActionType.RENAME_SHOPPING_LIST);
+        assertThat(actual.result()).isSameAs(after);
+        ArgumentCaptor<UpdateShoppingListRequest> cap =
+                ArgumentCaptor.forClass(UpdateShoppingListRequest.class);
+        verify(shoppingListService).updateList(eq(USER_ID), eq(listId), cap.capture());
+        assertThat(cap.getValue().name()).isEqualTo("Weekly shop");
+        assertThat(cap.getValue().active()).isTrue();
+        assertThat(action.getStatus()).isEqualTo(ChatActionStatus.CONFIRMED);
+    }
+
+    @Test
+    void confirm_deleteShoppingList_dispatchesDeleteAndReturnsNullResult() throws Exception {
+        Long listId = 55L;
+        DeleteShoppingListActionPayload payload =
+                new DeleteShoppingListActionPayload(listId, "Old list", 2);
+        ChatAction action = ChatAction.builder()
+                .id(ACTION_ID)
+                .session(ChatSession.builder().user(User.builder().id(USER_ID).build()).build())
+                .type(ChatActionType.DELETE_SHOPPING_LIST)
+                .status(ChatActionStatus.PENDING)
+                .payloadJson(objectMapper.writeValueAsString(payload))
+                .build();
+        when(actionRepository.findByIdAndUserId(ACTION_ID, USER_ID)).thenReturn(Optional.of(action));
+
+        ConfirmActionResponse actual = service.confirm(USER_ID, ACTION_ID);
+
+        assertThat(actual.actionType()).isEqualTo(ChatActionType.DELETE_SHOPPING_LIST);
+        assertThat(actual.result()).isNull();
+        verify(shoppingListService).deleteList(USER_ID, listId);
+        assertThat(action.getStatus()).isEqualTo(ChatActionStatus.CONFIRMED);
+    }
+
+    @Test
+    void confirm_updateRecipe_preservesUnchangedFieldsAndSubmitsMerged() throws Exception {
+        Long recipeId = 66L;
+        UpdateRecipeActionPayload payload = new UpdateRecipeActionPayload(
+                recipeId, "Pizza", null, null, 25, null);
+        ChatAction action = ChatAction.builder()
+                .id(ACTION_ID)
+                .session(ChatSession.builder().user(User.builder().id(USER_ID).build()).build())
+                .type(ChatActionType.UPDATE_RECIPE)
+                .status(ChatActionStatus.PENDING)
+                .payloadJson(objectMapper.writeValueAsString(payload))
+                .build();
+        when(actionRepository.findByIdAndUserId(ACTION_ID, USER_ID)).thenReturn(Optional.of(action));
+        RecipeResponse existing = new RecipeResponse(
+                recipeId, "Pizza", "Roll and bake.", 20,
+                new String[]{"italian"}, OffsetDateTime.now(), OffsetDateTime.now(),
+                java.util.List.<RecipeIngredientResponse>of());
+        RecipeResponse after = new RecipeResponse(
+                recipeId, "Pizza", "Roll and bake.", 25,
+                new String[]{"italian"}, existing.createdAt(), OffsetDateTime.now(),
+                java.util.List.<RecipeIngredientResponse>of());
+        when(recipeService.getRecipe(USER_ID, recipeId)).thenReturn(existing);
+        when(recipeService.updateRecipe(eq(USER_ID), eq(recipeId), any(UpdateRecipeRequest.class)))
+                .thenReturn(after);
+
+        ConfirmActionResponse actual = service.confirm(USER_ID, ACTION_ID);
+
+        assertThat(actual.actionType()).isEqualTo(ChatActionType.UPDATE_RECIPE);
+        assertThat(actual.result()).isSameAs(after);
+        ArgumentCaptor<UpdateRecipeRequest> cap =
+                ArgumentCaptor.forClass(UpdateRecipeRequest.class);
+        verify(recipeService).updateRecipe(eq(USER_ID), eq(recipeId), cap.capture());
+        assertThat(cap.getValue().title()).isEqualTo("Pizza");
+        assertThat(cap.getValue().instructions()).isEqualTo("Roll and bake.");
+        assertThat(cap.getValue().cookTimeMinutes()).isEqualTo(25);
+        assertThat(cap.getValue().tags()).containsExactly("italian");
+    }
+
+    @Test
+    void confirm_updateRecipe_withNewTitleAndEmptyTags_clearsTagsAndUsesNewTitle() throws Exception {
+        Long recipeId = 66L;
+        UpdateRecipeActionPayload payload = new UpdateRecipeActionPayload(
+                recipeId, "Pizza", "Neopolitan pizza", null, null,
+                java.util.List.of());
+        ChatAction action = ChatAction.builder()
+                .id(ACTION_ID)
+                .session(ChatSession.builder().user(User.builder().id(USER_ID).build()).build())
+                .type(ChatActionType.UPDATE_RECIPE)
+                .status(ChatActionStatus.PENDING)
+                .payloadJson(objectMapper.writeValueAsString(payload))
+                .build();
+        when(actionRepository.findByIdAndUserId(ACTION_ID, USER_ID)).thenReturn(Optional.of(action));
+        RecipeResponse existing = new RecipeResponse(
+                recipeId, "Pizza", "Roll and bake.", 20,
+                new String[]{"italian"}, OffsetDateTime.now(), OffsetDateTime.now(),
+                java.util.List.<RecipeIngredientResponse>of());
+        when(recipeService.getRecipe(USER_ID, recipeId)).thenReturn(existing);
+        when(recipeService.updateRecipe(eq(USER_ID), eq(recipeId), any(UpdateRecipeRequest.class)))
+                .thenReturn(existing);
+
+        service.confirm(USER_ID, ACTION_ID);
+
+        ArgumentCaptor<UpdateRecipeRequest> cap =
+                ArgumentCaptor.forClass(UpdateRecipeRequest.class);
+        verify(recipeService).updateRecipe(eq(USER_ID), eq(recipeId), cap.capture());
+        assertThat(cap.getValue().title()).isEqualTo("Neopolitan pizza");
+        assertThat(cap.getValue().tags()).isEmpty();
     }
 }

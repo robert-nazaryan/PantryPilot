@@ -23,7 +23,12 @@ import {
   X,
 } from "lucide-react";
 import { useConfirmChatActionMutation, useSendChatMessageMutation } from "../hooks/useAiChat";
-import { ApiError } from "../api/client";
+import {
+  classifyConfirmError,
+  classifySendError,
+  formatRelativeTime,
+} from "./aiChatErrors";
+import type { ChatErrorKind, ConfirmErrorKind } from "./aiChatErrors";
 import type {
   AddRecipeIngredientPayload,
   AddShoppingListItemPayload,
@@ -34,15 +39,20 @@ import type {
   CreateShoppingListPayload,
   DeletePantryItemPayload,
   DeleteRecipePayload,
+  DeleteShoppingListPayload,
   GenerateShoppingListFromRecipePayload,
   ProposedAction,
   RemoveRecipeIngredientPayload,
   RemoveShoppingListItemPayload,
+  RenameShoppingListPayload,
   SetShoppingListItemCheckedPayload,
   UpdatePantryItemPayload,
+  UpdateRecipePayload,
 } from "../types/aiChat";
 
 const SESSION_STORAGE_KEY = "pantrypilot.ai.sessionId";
+const TIMESTAMP_TICK_MS = 30_000;
+const BULK_TARGETS_COLLAPSED = 8;
 
 interface AiChatPanelProps {
   open: boolean;
@@ -54,15 +64,17 @@ type ActionLifecycle = "pending" | "confirming" | "confirmed" | "dismissed" | "f
 interface ActionEntry {
   kind: "action";
   entryId: string;
+  createdAt: number;
   action: ProposedAction;
   status: ActionLifecycle;
   errorMessage?: string;
+  errorKind?: ConfirmErrorKind;
 }
 
 type TranscriptEntry =
-  | { kind: "user"; content: string }
-  | { kind: "assistant"; content: string }
-  | { kind: "error"; content: string }
+  | { kind: "user"; createdAt: number; content: string }
+  | { kind: "assistant"; createdAt: number; content: string }
+  | { kind: "error"; createdAt: number; content: string; errorKind: ChatErrorKind }
   | ActionEntry;
 
 function loadPersistedSessionId(): number | null {
@@ -83,6 +95,7 @@ export function AiChatPanel({ open, onClose }: AiChatPanelProps): ReactNode {
   const [sessionId, setSessionId] = useState<number | null>(() => loadPersistedSessionId());
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [draft, setDraft] = useState("");
+  const [now, setNow] = useState<number>(() => Date.now());
   const scrollAnchorRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -106,6 +119,12 @@ export function AiChatPanel({ open, onClose }: AiChatPanelProps): ReactNode {
     scrollAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [transcript, sendMutation.isPending]);
 
+  useEffect(() => {
+    if (!open) return;
+    const id = window.setInterval(() => setNow(Date.now()), TIMESTAMP_TICK_MS);
+    return () => window.clearInterval(id);
+  }, [open]);
+
   function resetSession(): void {
     setSessionId(null);
     persistSessionId(null);
@@ -122,15 +141,21 @@ export function AiChatPanel({ open, onClose }: AiChatPanelProps): ReactNode {
   }
 
   function handleConfirmAction(entry: ActionEntry): void {
-    updateActionEntry(entry.entryId, { status: "confirming", errorMessage: undefined });
+    updateActionEntry(entry.entryId, {
+      status: "confirming",
+      errorMessage: undefined,
+      errorKind: undefined,
+    });
     confirmMutation.mutate(entry.action.actionId, {
       onSuccess: () => {
         updateActionEntry(entry.entryId, { status: "confirmed" });
       },
       onError: (err) => {
+        const detail = classifyConfirmError(err);
         updateActionEntry(entry.entryId, {
           status: "failed",
-          errorMessage: friendlyConfirmError(err),
+          errorMessage: detail.message,
+          errorKind: detail.kind,
         });
       },
     });
@@ -143,7 +168,8 @@ export function AiChatPanel({ open, onClose }: AiChatPanelProps): ReactNode {
   function submit(): void {
     const trimmed = draft.trim();
     if (!trimmed || sendMutation.isPending) return;
-    setTranscript((prev) => [...prev, { kind: "user", content: trimmed }]);
+    const sentAt = Date.now();
+    setTranscript((prev) => [...prev, { kind: "user", createdAt: sentAt, content: trimmed }]);
     setDraft("");
     sendMutation.mutate(
       { sessionId, message: trimmed },
@@ -151,12 +177,17 @@ export function AiChatPanel({ open, onClose }: AiChatPanelProps): ReactNode {
         onSuccess: (data) => {
           setSessionId(data.sessionId);
           persistSessionId(data.sessionId);
+          const receivedAt = Date.now();
           setTranscript((prev) => {
-            const next: TranscriptEntry[] = [...prev, { kind: "assistant", content: data.reply }];
+            const next: TranscriptEntry[] = [
+              ...prev,
+              { kind: "assistant", createdAt: receivedAt, content: data.reply },
+            ];
             if (data.proposedAction) {
               next.push({
                 kind: "action",
                 entryId: `action-${data.proposedAction.actionId}`,
+                createdAt: receivedAt,
                 action: data.proposedAction,
                 status: "pending",
               });
@@ -165,8 +196,11 @@ export function AiChatPanel({ open, onClose }: AiChatPanelProps): ReactNode {
           });
         },
         onError: (err) => {
-          const msg = friendlySendError(err);
-          setTranscript((prev) => [...prev, { kind: "error", content: msg }]);
+          const detail = classifySendError(err);
+          setTranscript((prev) => [
+            ...prev,
+            { kind: "error", createdAt: Date.now(), content: detail.message, errorKind: detail.kind },
+          ]);
         },
       },
     );
@@ -249,6 +283,7 @@ export function AiChatPanel({ open, onClose }: AiChatPanelProps): ReactNode {
               <TranscriptRow
                 key={entry.kind === "action" ? entry.entryId : idx}
                 entry={entry}
+                now={now}
                 onConfirm={handleConfirmAction}
                 onDismiss={handleDismissAction}
               />
@@ -337,41 +372,70 @@ function EmptyPrompt(): ReactNode {
 
 interface TranscriptRowProps {
   entry: TranscriptEntry;
+  now: number;
   onConfirm: (entry: ActionEntry) => void;
   onDismiss: (entry: ActionEntry) => void;
 }
 
-function TranscriptRow({ entry, onConfirm, onDismiss }: TranscriptRowProps): ReactNode {
+function TranscriptRow({ entry, now, onConfirm, onDismiss }: TranscriptRowProps): ReactNode {
+  const stamp = formatRelativeTime(entry.createdAt, now);
   if (entry.kind === "user") {
     return (
-      <li className="flex justify-end">
+      <li className="flex flex-col items-end gap-1">
         <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary px-3 py-2 text-body-sm text-white shadow-sm">
           {entry.content}
         </div>
+        <time
+          dateTime={new Date(entry.createdAt).toISOString()}
+          className="text-caption text-text-secondary dark:text-text-secondary-dark"
+        >
+          {stamp}
+        </time>
       </li>
     );
   }
   if (entry.kind === "error") {
     return (
-      <li className="flex justify-start">
+      <li
+        className="flex flex-col items-start gap-1"
+        data-testid={`chat-error-${entry.errorKind}`}
+      >
         <div className="max-w-[85%] rounded-2xl rounded-bl-md border border-warning/40 bg-warning/10 px-3 py-2 text-body-sm text-warning">
           {entry.content}
         </div>
+        <time
+          dateTime={new Date(entry.createdAt).toISOString()}
+          className="text-caption text-text-secondary dark:text-text-secondary-dark"
+        >
+          {stamp}
+        </time>
       </li>
     );
   }
   if (entry.kind === "action") {
     return (
-      <li className="flex justify-start">
+      <li className="flex flex-col items-start gap-1">
         <ProposedActionCard entry={entry} onConfirm={onConfirm} onDismiss={onDismiss} />
+        <time
+          dateTime={new Date(entry.createdAt).toISOString()}
+          className="text-caption text-text-secondary dark:text-text-secondary-dark"
+        >
+          {stamp}
+        </time>
       </li>
     );
   }
   return (
-    <li className="flex justify-start">
+    <li className="flex flex-col items-start gap-1">
       <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-bl-md border border-border-subtle bg-white px-3 py-2 text-body-sm text-text-primary shadow-sm dark:border-border-subtle-dark dark:bg-surface-card-dark dark:text-text-primary-dark">
         {entry.content}
       </div>
+      <time
+        dateTime={new Date(entry.createdAt).toISOString()}
+        className="text-caption text-text-secondary dark:text-text-secondary-dark"
+      >
+        {stamp}
+      </time>
     </li>
   );
 }
@@ -427,6 +491,10 @@ function actionHeader(action: ProposedAction): { icon: IconType; title: string }
       return { icon: Minus, title: "Use from pantry" };
     case "CREATE_SHOPPING_LIST":
       return { icon: ClipboardList, title: "Create shopping list" };
+    case "RENAME_SHOPPING_LIST":
+      return { icon: Pencil, title: "Rename shopping list" };
+    case "DELETE_SHOPPING_LIST":
+      return { icon: Trash2, title: "Delete shopping list" };
     case "ADD_SHOPPING_LIST_ITEM":
       return { icon: ListPlus, title: "Add to shopping list" };
     case "REMOVE_SHOPPING_LIST_ITEM":
@@ -439,6 +507,8 @@ function actionHeader(action: ProposedAction): { icon: IconType; title: string }
       return { icon: ClipboardList, title: "Generate shopping list from recipe" };
     case "CREATE_RECIPE":
       return { icon: ChefHat, title: "Save recipe" };
+    case "UPDATE_RECIPE":
+      return { icon: Pencil, title: "Update recipe" };
     case "DELETE_RECIPE":
       return { icon: Trash2, title: "Delete recipe" };
     case "ADD_RECIPE_INGREDIENT":
@@ -466,6 +536,10 @@ function ActionCardBody({ action }: { action: ProposedAction }): ReactNode {
       return <ConsumeActionBody payload={action.payload} />;
     case "CREATE_SHOPPING_LIST":
       return <CreateShoppingListBody payload={action.payload} />;
+    case "RENAME_SHOPPING_LIST":
+      return <RenameShoppingListBody payload={action.payload} />;
+    case "DELETE_SHOPPING_LIST":
+      return <DeleteShoppingListBody payload={action.payload} />;
     case "ADD_SHOPPING_LIST_ITEM":
       return <AddShoppingListItemBody payload={action.payload} />;
     case "REMOVE_SHOPPING_LIST_ITEM":
@@ -477,6 +551,8 @@ function ActionCardBody({ action }: { action: ProposedAction }): ReactNode {
       return <GenerateShoppingListFromRecipeBody payload={action.payload} />;
     case "CREATE_RECIPE":
       return <CreateRecipeBody payload={action.payload} />;
+    case "UPDATE_RECIPE":
+      return <UpdateRecipeBody payload={action.payload} />;
     case "DELETE_RECIPE":
       return <DeleteRecipeBody payload={action.payload} />;
     case "ADD_RECIPE_INGREDIENT":
@@ -619,6 +695,10 @@ function confirmedLabel(type: ProposedAction["type"]): string {
       return "Consumed";
     case "CREATE_SHOPPING_LIST":
       return "Shopping list created";
+    case "RENAME_SHOPPING_LIST":
+      return "Shopping list renamed";
+    case "DELETE_SHOPPING_LIST":
+      return "Shopping list deleted";
     case "ADD_SHOPPING_LIST_ITEM":
       return "Added to shopping list";
     case "REMOVE_SHOPPING_LIST_ITEM":
@@ -631,6 +711,8 @@ function confirmedLabel(type: ProposedAction["type"]): string {
       return "Shopping list generated";
     case "CREATE_RECIPE":
       return "Recipe saved";
+    case "UPDATE_RECIPE":
+      return "Recipe updated";
     case "DELETE_RECIPE":
       return "Recipe deleted";
     case "ADD_RECIPE_INGREDIENT":
@@ -648,6 +730,36 @@ function CreateShoppingListBody({ payload }: { payload: CreateShoppingListPayloa
       <ClipboardList className="h-4 w-4 text-text-secondary dark:text-text-secondary-dark" aria-hidden />
       <span>
         Create list <span className="font-medium">{payload.name?.trim() || "Shopping List"}</span>
+      </span>
+    </div>
+  );
+}
+
+function RenameShoppingListBody({ payload }: { payload: RenameShoppingListPayload }): ReactNode {
+  return (
+    <div className="mb-3 flex flex-col gap-1 text-body-sm text-text-primary dark:text-text-primary-dark">
+      <span>
+        Rename <span className="font-medium">{payload.currentName}</span>
+      </span>
+      <span className="text-text-secondary dark:text-text-secondary-dark">
+        to <span className="font-medium">{payload.newName}</span>
+      </span>
+    </div>
+  );
+}
+
+function DeleteShoppingListBody({ payload }: { payload: DeleteShoppingListPayload }): ReactNode {
+  return (
+    <div className="mb-3 flex items-start gap-2 text-body-sm text-text-primary dark:text-text-primary-dark">
+      <Trash2 className="mt-0.5 h-4 w-4 text-text-secondary dark:text-text-secondary-dark" aria-hidden />
+      <span>
+        Delete list <span className="font-medium">{payload.listName}</span>
+        {payload.itemCount > 0 ? (
+          <span className="text-text-secondary dark:text-text-secondary-dark">
+            {" "}
+            (and its {payload.itemCount} item{payload.itemCount === 1 ? "" : "s"})
+          </span>
+        ) : null}
       </span>
     </div>
   );
@@ -724,6 +836,38 @@ function CreateRecipeBody({ payload }: { payload: CreateRecipePayload }): ReactN
   );
 }
 
+function UpdateRecipeBody({ payload }: { payload: UpdateRecipePayload }): ReactNode {
+  const changes: string[] = [];
+  if (payload.newTitle && payload.newTitle.trim() && payload.newTitle !== payload.currentTitle) {
+    changes.push(`rename to "${payload.newTitle}"`);
+  }
+  if (payload.instructions && payload.instructions.trim()) {
+    changes.push("update instructions");
+  }
+  if (payload.cookTimeMinutes != null) {
+    changes.push(`cook time ${payload.cookTimeMinutes} min`);
+  }
+  if (payload.tags != null) {
+    changes.push(payload.tags.length > 0 ? `tags: ${payload.tags.join(", ")}` : "clear tags");
+  }
+  return (
+    <div className="mb-3 flex flex-col gap-1 text-body-sm text-text-primary dark:text-text-primary-dark">
+      <span>
+        Update <span className="font-medium">{payload.currentTitle}</span>
+      </span>
+      {changes.length > 0 ? (
+        <ul className="ml-4 list-disc space-y-0.5 text-text-secondary dark:text-text-secondary-dark">
+          {changes.map((c) => (
+            <li key={c}>{c}</li>
+          ))}
+        </ul>
+      ) : (
+        <span className="text-text-secondary dark:text-text-secondary-dark">no changes proposed</span>
+      )}
+    </div>
+  );
+}
+
 function DeleteRecipeBody({ payload }: { payload: DeleteRecipePayload }): ReactNode {
   return (
     <div className="mb-3 flex items-center gap-2 text-body-sm text-text-primary dark:text-text-primary-dark">
@@ -762,21 +906,38 @@ function RemoveRecipeIngredientBody({ payload }: { payload: RemoveRecipeIngredie
 }
 
 function BulkActionBody({ payload }: { payload: BulkActionPayload }): ReactNode {
+  const [expanded, setExpanded] = useState(false);
   const targets = payload.targets ?? [];
+  const isLong = targets.length > BULK_TARGETS_COLLAPSED;
+  const shown = expanded || !isLong ? targets : targets.slice(0, BULK_TARGETS_COLLAPSED);
+  const hiddenCount = targets.length - shown.length;
   return (
     <div className="mb-3 flex flex-col gap-2 text-body-sm text-text-primary dark:text-text-primary-dark">
       <span className="font-medium">
         {payload.summary || `Apply ${payload.subActionType} to ${targets.length} target${targets.length === 1 ? "" : "s"}`}
       </span>
       {targets.length > 0 ? (
-        <ul className="ml-4 max-h-40 list-disc space-y-0.5 overflow-y-auto text-text-secondary dark:text-text-secondary-dark">
-          {targets.slice(0, 15).map((t, i) => (
-            <li key={i}>{summarizeBulkTarget(t)}</li>
-          ))}
-          {targets.length > 15 ? (
-            <li className="list-none italic">+ {targets.length - 15} more…</li>
+        <>
+          <ul
+            className={
+              "ml-4 list-disc space-y-0.5 text-text-secondary dark:text-text-secondary-dark " +
+              (expanded ? "max-h-56 overflow-y-auto" : "")
+            }
+          >
+            {shown.map((t, i) => (
+              <li key={i}>{summarizeBulkTarget(t)}</li>
+            ))}
+          </ul>
+          {isLong ? (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="self-start text-caption font-medium text-primary transition-colors duration-150 hover:text-primary-hover"
+            >
+              {expanded ? "Show fewer" : `Show all ${targets.length} (${hiddenCount} more)`}
+            </button>
           ) : null}
-        </ul>
+        </>
       ) : null}
     </div>
   );
@@ -810,9 +971,9 @@ function ActionCardFooter({ entry, onConfirm, onDismiss }: ActionCardFooterProps
   }
   if (entry.status === "failed") {
     return (
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2" data-testid={`chat-confirm-error-${entry.errorKind ?? "unknown"}`}>
         <p className="text-body-sm text-warning">
-          {entry.errorMessage ?? "Could not add this item."}
+          {entry.errorMessage ?? "Could not apply this change."}
         </p>
         <div className="flex items-center gap-2">
           <button
@@ -863,7 +1024,7 @@ function ActionCardFooter({ entry, onConfirm, onDismiss }: ActionCardFooterProps
 
 function TypingRow(): ReactNode {
   return (
-    <li className="flex justify-start" aria-live="polite" aria-label="Assistant is typing">
+    <li className="flex justify-start" aria-live="polite" aria-label="Assistant is typing" data-testid="chat-typing-indicator">
       <div className="flex items-center gap-1 rounded-2xl rounded-bl-md border border-border-subtle bg-white px-3 py-3 shadow-sm dark:border-border-subtle-dark dark:bg-surface-card-dark">
         <span className="h-2 w-2 animate-bounce rounded-full bg-text-secondary/60 [animation-delay:-0.3s] dark:bg-text-secondary-dark/60" />
         <span className="h-2 w-2 animate-bounce rounded-full bg-text-secondary/60 [animation-delay:-0.15s] dark:bg-text-secondary-dark/60" />
@@ -871,37 +1032,4 @@ function TypingRow(): ReactNode {
       </div>
     </li>
   );
-}
-
-function friendlySendError(err: unknown): string {
-  if (err instanceof ApiError) {
-    if (err.status === 503 || err.code === "ai_unavailable") {
-      return "The assistant isn't available right now — check back later.";
-    }
-    if (err.status === 404) {
-      return "This chat session no longer exists. Start a new chat and try again.";
-    }
-    if (err.status === 401) {
-      return "Your session expired. Sign in again to continue chatting.";
-    }
-  }
-  return "Something went wrong reaching the assistant. Please try again.";
-}
-
-function friendlyConfirmError(err: unknown): string {
-  if (err instanceof ApiError) {
-    if (err.code === "insufficient_quantity") {
-      return "Not enough on hand to consume that much — ask again with a smaller amount.";
-    }
-    if (err.code === "stale_chat_action" || err.status === 409) {
-      return "This proposal is no longer valid — ask again to try a fresh one.";
-    }
-    if (err.status === 404) {
-      return "This proposal is no longer available.";
-    }
-    if (err.status === 401) {
-      return "Your session expired. Sign in again to confirm.";
-    }
-  }
-  return "Could not apply this change. Please try again.";
 }
